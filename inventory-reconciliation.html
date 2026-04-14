@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>库存对账工具 · Inventory Reconciliation</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0f14;
+    --surface: #141720;
+    --surface2: #1c2030;
+    --border: #252a38;
+    --border2: #2e3448;
+    --accent: #4f7cff;
+    --accent2: #7c5fff;
+    --green: #22c55e;
+    --yellow: #f59e0b;
+    --orange: #f97316;
+    --red: #ef4444;
+    --text: #e8eaf2;
+    --text2: #8b90a8;
+    --text3: #555b72;
+    --font: 'DM Sans', sans-serif;
+    --mono: 'DM Mono', monospace;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 20px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: var(--surface);
+  }
+  .logo {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 600; color: #fff;
+    flex-shrink: 0;
+  }
+  header h1 { font-size: 15px; font-weight: 600; color: var(--text); }
+  header p  { font-size: 12px; color: var(--text2); margin-top: 1px; }
+  .badge {
+    margin-left: auto;
+    background: rgba(79,124,255,.15);
+    border: 1px solid rgba(79,124,255,.3);
+    color: var(--accent);
+    font-size: 11px; font-weight: 500;
+    padding: 3px 10px; border-radius: 20px;
+    font-family: var(--mono);
+  }
+
+  /* ── MAIN LAYOUT ── */
+  main {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  /* ── SECTION LABELS ── */
+  .section-label {
+    font-size: 11px; font-weight: 500; letter-spacing: .08em;
+    color: var(--text3); text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  /* ── UPLOAD CARDS ── */
+  .upload-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+    margin-bottom: 24px;
+  }
+  @media (max-width: 600px) { .upload-grid { grid-template-columns: 1fr; } }
+
+  .upload-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    transition: border-color .2s;
+  }
+  .upload-card:focus-within { border-color: var(--accent); }
+
+  .upload-card .card-label {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; font-weight: 500; color: var(--text);
+    margin-bottom: 4px;
+  }
+  .upload-card .card-label .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent); flex-shrink: 0;
+  }
+  .upload-card .card-label .dot.orange { background: var(--orange); }
+  .upload-card .card-sub {
+    font-size: 11px; color: var(--text2); margin-bottom: 14px; margin-left: 16px;
+  }
+
+  .drop-zone {
+    border: 1.5px dashed var(--border2);
+    border-radius: 10px;
+    padding: 24px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .2s;
+    position: relative;
+  }
+  .drop-zone:hover { border-color: var(--accent); background: rgba(79,124,255,.04); }
+  .drop-zone.has-file { border-style: solid; border-color: var(--green); background: rgba(34,197,94,.05); }
+  .drop-zone.drag-over { border-color: var(--accent); background: rgba(79,124,255,.08); }
+
+  .drop-zone input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .drop-icon { font-size: 24px; margin-bottom: 8px; }
+  .drop-text { font-size: 12px; color: var(--text2); }
+  .drop-text strong { color: var(--accent); font-weight: 500; }
+  .file-name {
+    font-size: 12px; color: var(--green); font-weight: 500;
+    font-family: var(--mono); margin-top: 6px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* ── OPTIONS ── */
+  .options-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  .options-row {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .option-label { font-size: 13px; color: var(--text2); flex-shrink: 0; }
+
+  .toggle-group { display: flex; gap: 6px; }
+  .toggle-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 12px; font-weight: 500; color: var(--text2);
+    cursor: pointer; transition: all .15s;
+    font-family: var(--font);
+  }
+  .toggle-btn.active {
+    background: rgba(79,124,255,.2);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* ── RUN BUTTON ── */
+  .run-btn {
+    width: 100%;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none; border-radius: 12px;
+    padding: 16px;
+    font-size: 14px; font-weight: 600; color: #fff;
+    cursor: pointer;
+    transition: opacity .15s, transform .1s;
+    font-family: var(--font);
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    margin-bottom: 32px;
+  }
+  .run-btn:hover { opacity: .9; }
+  .run-btn:active { transform: scale(.99); }
+  .run-btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+  /* ── PROGRESS ── */
+  .progress-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 24px;
+    display: none;
+  }
+  .progress-wrap.visible { display: block; }
+  .progress-header { display: flex; justify-content: space-between; margin-bottom: 10px; }
+  .progress-title { font-size: 13px; font-weight: 500; }
+  .progress-pct { font-size: 13px; font-family: var(--mono); color: var(--accent); }
+  .progress-bar-bg {
+    height: 4px; background: var(--border2); border-radius: 4px; overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 4px; transition: width .3s ease;
+    width: 0%;
+  }
+  .progress-steps { margin-top: 12px; display: flex; flex-direction: column; gap: 4px; }
+  .step-item {
+    font-size: 12px; color: var(--text3);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .step-item.active { color: var(--text2); }
+  .step-item.done { color: var(--green); }
+  .step-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+
+  /* ── STATS ── */
+  .stats-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+    margin-bottom: 16px;
+  }
+  @media (max-width: 600px) { .stats-grid { grid-template-columns: 1fr 1fr; } }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .stat-card .s-label { font-size: 11px; color: var(--text3); margin-bottom: 4px; }
+  .stat-card .s-value { font-size: 22px; font-weight: 600; font-family: var(--mono); }
+  .stat-card .s-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .c-green { color: var(--green); }
+  .c-yellow { color: var(--yellow); }
+  .c-orange { color: var(--orange); }
+  .c-red { color: var(--red); }
+  .c-accent { color: var(--accent); }
+
+  .stats-row2 {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    margin-bottom: 24px;
+  }
+  @media (max-width: 500px) { .stats-row2 { grid-template-columns: 1fr; } }
+
+  .mini-stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .mini-stat .ms-label { font-size: 12px; color: var(--text2); }
+  .mini-stat .ms-val { font-size: 14px; font-weight: 600; font-family: var(--mono); }
+
+  /* ── SHAPE TABLE ── */
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+  .table-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px; font-weight: 500; color: var(--text2);
+    display: flex; align-items: center; gap: 8px;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    text-align: left; padding: 10px 20px;
+    font-size: 11px; font-weight: 500; letter-spacing: .05em;
+    color: var(--text3); text-transform: uppercase;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+  }
+  th:not(:first-child) { text-align: right; }
+  td {
+    padding: 9px 20px;
+    font-size: 13px; color: var(--text);
+    border-bottom: 1px solid var(--border);
+  }
+  td:not(:first-child) { text-align: right; font-family: var(--mono); font-size: 12px; }
+  tr:last-child td { border-bottom: none; }
+  tr.total-row td { font-weight: 600; background: var(--surface2); }
+  .diff-pos { color: var(--orange); }
+  .diff-neg { color: var(--yellow); }
+  .diff-zero { color: var(--text3); }
+
+  /* ── DOWNLOAD ── */
+  .download-btn {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 14px; font-weight: 500; color: var(--text);
+    cursor: pointer;
+    transition: all .15s;
+    font-family: var(--font);
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    margin-bottom: 32px;
+  }
+  .download-btn:hover {
+    border-color: var(--green);
+    color: var(--green);
+    background: rgba(34,197,94,.06);
+  }
+
+  /* ── ERROR ── */
+  .error-msg {
+    background: rgba(239,68,68,.1);
+    border: 1px solid rgba(239,68,68,.3);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 13px; color: var(--red);
+    margin-bottom: 20px;
+    display: none;
+  }
+  .error-msg.visible { display: block; }
+
+  /* ── RESULT SECTION ── */
+  #result-section { display: none; }
+  #result-section.visible { display: block; }
+
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    display: none;
+  }
+  .spinner.visible { display: block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── FOOTER ── */
+  footer {
+    text-align: center;
+    padding: 24px;
+    font-size: 11px;
+    color: var(--text3);
+    border-top: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">D</div>
+  <div>
+    <h1>库存对账工具</h1>
+    <p>Inventory Reconciliation · Doveggs</p>
+  </div>
+  <span class="badge">v1.3</span>
+</header>
+
+<main>
+
+  <!-- UPLOAD -->
+  <div class="section-label">上传文件 Upload Files</div>
+  <div class="upload-grid">
+    <div class="upload-card">
+      <div class="card-label"><span class="dot"></span>供应商库存表</div>
+      <div class="card-sub">Supplier Inventory · 支持"已筛选"或原生表</div>
+      <div class="drop-zone" id="sup-drop">
+        <input type="file" id="sup-file" accept=".xlsx,.xls">
+        <div class="drop-icon">📦</div>
+        <div class="drop-text">拖拽文件到此处，或 <strong>点击选择</strong></div>
+        <div class="file-name" id="sup-name" style="display:none"></div>
+      </div>
+    </div>
+    <div class="upload-card">
+      <div class="card-label"><span class="dot orange"></span>商店库存表</div>
+      <div class="card-sub">Store Inventory · Shopify 导出</div>
+      <div class="drop-zone" id="sto-drop">
+        <input type="file" id="sto-file" accept=".xlsx,.xls">
+        <div class="drop-icon">🏪</div>
+        <div class="drop-text">拖拽文件到此处，或 <strong>点击选择</strong></div>
+        <div class="file-name" id="sto-name" style="display:none"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPTIONS -->
+  <div class="options-card">
+    <div class="section-label" style="margin-bottom:10px">供应商表类型 Supplier Sheet Type</div>
+    <div class="options-row">
+      <span class="option-label">供应商表：</span>
+      <div class="toggle-group">
+        <button class="toggle-btn active" id="btn-filtered" onclick="setSupType('filtered')">已筛选 Sheet</button>
+        <button class="toggle-btn" id="btn-raw" onclick="setSupType('raw')">原生表（自动筛选）</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ERROR -->
+  <div class="error-msg" id="error-msg"></div>
+
+  <!-- RUN -->
+  <button class="run-btn" id="run-btn" onclick="runReconciliation()">
+    <div class="spinner" id="spinner"></div>
+    <span id="run-text">▶ 生成对账报告 Generate Report</span>
+  </button>
+
+  <!-- PROGRESS -->
+  <div class="progress-wrap" id="progress-wrap">
+    <div class="progress-header">
+      <span class="progress-title">处理中...</span>
+      <span class="progress-pct" id="pct">0%</span>
+    </div>
+    <div class="progress-bar-bg"><div class="progress-bar" id="progress-bar"></div></div>
+    <div class="progress-steps" id="steps"></div>
+  </div>
+
+  <!-- RESULT -->
+  <div id="result-section">
+    <div class="section-label">对账摘要 Summary</div>
+
+    <div class="stats-grid" id="stats-grid"></div>
+    <div class="stats-row2" id="stats-row2"></div>
+
+    <div class="section-label">形状汇总（总览）Shape Summary — All</div>
+    <div class="table-wrap" id="table-all"></div>
+
+    <div class="section-label" style="margin-top:24px">形状汇总（1ct+ DEF色）Shape Summary — ≥1ct D/E/F</div>
+    <div class="table-wrap" id="table-def"></div>
+
+    <button class="download-btn" id="dl-btn">
+      ⬇ 下载完整 Excel 对账报告 Download Full Report
+    </button>
+  </div>
+
+</main>
+
+<footer>Doveggs Inventory Reconciliation Tool · v1.3 · 数据在本地处理，不上传服务器</footer>
+
+<script>
+// ════════════════════════════════════════════════════════════
+// CONSTANTS
+// ════════════════════════════════════════════════════════════
+const TARGET_SHAPES = [
+  'Asscher','Cushion','Emerald','Heart','Marquise',
+  'Oval','Pear','Princess','Radiant','Round',
+  'Step Cut Oval','Step Cut Pear','Step Cut Marquise',
+  'Old Mine Oval','Old Mine Pear','Oval Rose Cut','Round Rose Cut'
+];
+const TARGET_LOCS   = ['SURAT','INDIA','HONG KONG','HONG KONG'];
+const EXCL_COLORS   = ['G','H','I','FG'];
+const DEF_COLORS    = ['D','E','F'];
+
+const SUP_SHAPE_MAP = {
+  'Oval-M':'Oval','Long Cushion':'Cushion',
+  'Oval (Rose)':'Oval Rose Cut','Round (Rose)':'Round Rose Cut'
+};
+const STO_SHAPE_MAP = {
+  'Oval Modified Step':'Step Cut Oval',
+  'Pear Modified Step':'Step Cut Pear',
+  'Marquise Modified Step':'Step Cut Marquise'
+};
+
+const SKU_COL    = 'Metafield: custom.sku [single_line_text_field]';
+const REPORT_COL = 'Metafield: custom.report [single_line_text_field]';
+const SHAPE_COL  = 'Metafield: custom.shape [single_line_text_field]';
+const INV_COL    = 'Variant Inventory Qty';
+const COLOR_COL  = 'Metafield: custom.color [single_line_text_field]';
+const WEIGHT_COL = 'Metafield: custom.weight [single_line_text_field]';
+const CERT_COL   = 'Metafield: custom.certificate_file [single_line_text_field]';
+const PPC_COL    = 'Metafield: custom.price_per_carat [single_line_text_field]';
+
+// ════════════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════════════
+let supType = 'filtered';
+let supFile = null, stoFile = null;
+let xlsxResult = null;
+
+// ════════════════════════════════════════════════════════════
+// UI HELPERS
+// ════════════════════════════════════════════════════════════
+function setSupType(t) {
+  supType = t;
+  document.getElementById('btn-filtered').classList.toggle('active', t==='filtered');
+  document.getElementById('btn-raw').classList.toggle('active', t==='raw');
+}
+
+function setupDrop(dropId, inputId, nameId, onFile) {
+  const drop = document.getElementById(dropId);
+  const input = document.getElementById(inputId);
+  const nameEl = document.getElementById(nameId);
+
+  input.addEventListener('change', () => {
+    if(input.files[0]) setFile(input.files[0]);
+  });
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag-over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('drag-over'));
+  drop.addEventListener('drop', e => {
+    e.preventDefault(); drop.classList.remove('drag-over');
+    if(e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+  });
+
+  function setFile(f) {
+    onFile(f);
+    nameEl.textContent = '✓ ' + f.name;
+    nameEl.style.display = 'block';
+    drop.classList.add('has-file');
+  }
+}
+
+setupDrop('sup-drop','sup-file','sup-name', f => supFile = f);
+setupDrop('sto-drop','sto-file','sto-name', f => stoFile = f);
+
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = msg; el.classList.add('visible');
+}
+function clearError() {
+  document.getElementById('error-msg').classList.remove('visible');
+}
+
+function setProgress(pct, steps) {
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('pct').textContent = pct + '%';
+  if(steps) {
+    document.getElementById('steps').innerHTML = steps.map(s =>
+      `<div class="step-item ${s.state}"><div class="step-dot"></div>${s.label}</div>`
+    ).join('');
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// EXCEL HELPERS
+// ════════════════════════════════════════════════════════════
+function readXlsx(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = e => {
+      try {
+        const wb = XLSX.read(e.target.result, {type:'array'});
+        res(wb);
+      } catch(err) { rej(err); }
+    };
+    r.onerror = rej;
+    r.readAsArrayBuffer(file);
+  });
+}
+
+function sheetToRows(wb, sheetName) {
+  const name = sheetName || wb.SheetNames[0];
+  const sheet = wb.Sheets[name] || wb.Sheets[wb.SheetNames[0]];
+  return XLSX.utils.sheet_to_json(sheet, {defval:''});
+}
+
+function normRef(s) { return String(s||'').replace(/-/g,'').toLowerCase().trim(); }
+function normSku(s)  { return String(s||'').replace(/-/g,'').toLowerCase().trim(); }
+
+function normSupShape(s) {
+  s = String(s||'').trim();
+  return SUP_SHAPE_MAP[s] || s;
+}
+function normStoShape(s) {
+  s = String(s||'').trim();
+  return STO_SHAPE_MAP[s] || s;
+}
+
+function extractCertNum(url) {
+  if(!url) return '';
+  url = String(url).trim();
+  let m = url.match(/[?&\/]r=([A-Za-z0-9]+)/);
+  if(m) return m[1].toUpperCase();
+  m = url.match(/reportno=([0-9]+)/);
+  if(m) return m[1];
+  m = url.match(/\/([A-Za-z0-9]+)\.pdf/);
+  if(m) return m[1];
+  return url;
+}
+
+function safeCerti(v) {
+  if(v === '' || v === null || v === undefined) return '';
+  const s = String(v).trim();
+  if(['nan','','-','none'].includes(s.toLowerCase())) return '';
+  const n = parseFloat(s);
+  if(!isNaN(n)) return String(Math.round(n));
+  return s;
+}
+
+function fmtPrice(v) {
+  if(v === '' || v === null || v === undefined) return '';
+  const n = parseFloat(v);
+  return isNaN(n) ? '' : Math.round(n * 100) / 100;
+}
+
+// ════════════════════════════════════════════════════════════
+// MAIN RECONCILIATION
+// ════════════════════════════════════════════════════════════
+async function runReconciliation() {
+  clearError();
+  if(!supFile) { showError('请上传供应商库存表'); return; }
+  if(!stoFile) { showError('请上传商店库存表');   return; }
+
+  const btn = document.getElementById('run-btn');
+  const spinner = document.getElementById('spinner');
+  const runText = document.getElementById('run-text');
+  btn.disabled = true;
+  spinner.classList.add('visible');
+  runText.textContent = '处理中...';
+
+  document.getElementById('progress-wrap').classList.add('visible');
+  document.getElementById('result-section').classList.remove('visible');
+
+  const steps = [
+    {label:'读取供应商文件', state:'active'},
+    {label:'读取商店文件', state:''},
+    {label:'数据筛选与归一化', state:''},
+    {label:'SKU 匹配', state:''},
+    {label:'证书 & 价格比对', state:''},
+    {label:'生成汇总与明细', state:''},
+    {label:'构建 Excel 报告', state:''},
+  ];
+
+  function markStep(i) {
+    for(let j=0;j<steps.length;j++) {
+      if(j<i) steps[j].state='done';
+      else if(j===i) steps[j].state='active';
+      else steps[j].state='';
+    }
+    setProgress(Math.round((i/steps.length)*90), steps);
+  }
+
+  try {
+    // Step 0
+    markStep(0);
+    const supWb = await readXlsx(supFile);
+
+    // Step 1
+    markStep(1);
+    const stoWb = await readXlsx(stoFile);
+
+    // Step 2 — Filter supplier
+    markStep(2);
+    let supSheetName = supWb.SheetNames.includes('已筛选') ? '已筛选' : supWb.SheetNames[0];
+    let supRows = sheetToRows(supWb, supSheetName);
+
+    if(supType === 'raw') {
+      supRows = supRows.filter(r => {
+        const loc = String(r.Location||'').toUpperCase().trim();
+        return TARGET_LOCS.includes(loc);
+      });
+      supRows = supRows.filter(r => !EXCL_COLORS.includes(String(r.Color||'').trim()));
+      supRows = supRows.filter(r => String(r.Status||'').trim() === 'Available');
+    }
+
+    // normalize shape and filter
+    supRows = supRows.map(r => ({...r, _shapeNorm: normSupShape(r.Shape||'')}));
+    supRows = supRows.filter(r => TARGET_SHAPES.includes(r._shapeNorm));
+    supRows.forEach(r => {
+      r._refNorm  = normRef(r['Ref.No.']||'');
+      r._certNum  = extractCertNum(r.Certilink);
+      r._ppcSup   = parseFloat(r['$/ct.']) || null;
+      r._certiClean = safeCerti(r['Certi.No.']);
+    });
+
+    // Step 2b — Filter store
+    let stoSheetName = stoWb.SheetNames.includes('Products') ? 'Products' : stoWb.SheetNames[0];
+    let stoRows = sheetToRows(stoWb, stoSheetName);
+    stoRows = stoRows.filter(r => String(r.Status||'').toLowerCase().trim() !== 'draft');
+
+    const stoShapeNorm = r => normStoShape(String(r[SHAPE_COL]||'').trim());
+    stoRows = stoRows.filter(r => TARGET_SHAPES.includes(stoShapeNorm(r)));
+
+    // dedup by SKU
+    const seenSku = new Set();
+    const stoDedup = [];
+    for(const r of stoRows) {
+      const sku = r[SKU_COL];
+      if(!sku) continue;
+      const norm = normSku(sku);
+      if(seenSku.has(norm)) continue;
+      seenSku.add(norm);
+      stoDedup.push({
+        ...r,
+        _skuNorm:    norm,
+        _shapeNorm:  stoShapeNorm(r),
+        _certNumSto: extractCertNum(r[CERT_COL]),
+        _ppcSto:     parseFloat(r[PPC_COL]) || null,
+      });
+    }
+
+    // Step 3 — Match
+    markStep(3);
+    const stoMap = new Map(stoDedup.map(r => [r._skuNorm, r]));
+
+    const matched   = [];
+    const missingRows = []; // supplier only
+    for(const sr of supRows) {
+      const sm = stoMap.get(sr._refNorm);
+      if(sm) {
+        matched.push({sup: sr, sto: sm, type:'matched'});
+        stoMap.delete(sr._refNorm);
+      } else {
+        missingRows.push({sup: sr, sto: null, type:'missing'});
+      }
+    }
+    const extraRows = [...stoMap.values()].map(sm => ({sup: null, sto: sm, type:'extra'}));
+
+    // Step 4 — Cert & price check
+    markStep(4);
+    let certMismatches = 0, priceMismatches = 0;
+    for(const row of matched) {
+      const {sup, sto} = row;
+      const grown = String(sup.Grown||'').toUpperCase().trim();
+      if(grown === 'CVD' && sup._certNum && sto._certNumSto && sup._certNum !== sto._certNumSto) {
+        row._certMismatch = true;
+        certMismatches++;
+      }
+      if(sup._ppcSup !== null && sto._ppcSto !== null) {
+        if(Math.abs(sup._ppcSup - sto._ppcSto) > 0.5) {
+          row._priceMismatch = true;
+          priceMismatches++;
+        }
+      }
+    }
+
+    // Step 5 — Stats & summaries
+    markStep(5);
+    const allRows = [...matched, ...missingRows, ...extraRows];
+
+    // status counts
+    let nMatch=0, nMissing=0, nExtra=0, nNeg=0;
+    for(const r of matched) {
+      const inv = parseInt(r.sto[INV_COL])||0;
+      if(inv < 0) nNeg++; else nMatch++;
+    }
+    nMissing = missingRows.length;
+    nExtra   = extraRows.length;
+
+    // helper: get carat/color
+    function getCarat(r) {
+      if(r.sup) { const v=parseFloat(r.sup.Carat); if(!isNaN(v)) return v; }
+      if(r.sto) { const v=parseFloat(r.sto[WEIGHT_COL]); if(!isNaN(v)) return v; }
+      return null;
+    }
+    function getColor(r) {
+      if(r.sup) { const c=String(r.sup.Color||'').trim(); if(c) return c; }
+      if(r.sto) { const c=String(r.sto[COLOR_COL]||'').trim(); if(c) return c; }
+      return '';
+    }
+    function getShape(r) {
+      if(r.sup) return r.sup._shapeNorm;
+      if(r.sto) return r.sto._shapeNorm;
+      return '';
+    }
+    function getSupQty(r) { return r.sup ? 1 : 0; }
+    function getStoQty(r) {
+      if(r.type==='extra') return 1;
+      if(r.sto) return parseInt(r.sto[INV_COL])||0;
+      return 0;
+    }
+
+    // shape summary
+    function buildShapeSummary(rows) {
+      const map = {};
+      for(const s of TARGET_SHAPES) map[s] = {sup:0, sto:0};
+      for(const r of rows) {
+        const s = getShape(r);
+        if(!map[s]) continue;
+        map[s].sup += getSupQty(r);
+        map[s].sto += getStoQty(r);
+      }
+      return TARGET_SHAPES.map(s => ({
+        shape: s, sup: map[s].sup, sto: map[s].sto, diff: map[s].sup - map[s].sto
+      }));
+    }
+
+    const ssAll = buildShapeSummary(allRows);
+    const rows1ctDef = allRows.filter(r => {
+      const c = getCarat(r); const col = getColor(r);
+      return c !== null && c >= 1.0 && DEF_COLORS.includes(col);
+    });
+    const ssDef = buildShapeSummary(rows1ctDef);
+
+    const sup1ctDef = rows1ctDef.reduce((a,r)=>a+getSupQty(r),0);
+    const sto1ctDef = rows1ctDef.reduce((a,r)=>a+getStoQty(r),0);
+
+    // Step 6 — Build Excel
+    markStep(6);
+    await new Promise(r => setTimeout(r, 50));
+    const wb = buildExcel(allRows, rows1ctDef, ssAll, ssDef,
+      {nMatch, nMissing, nExtra, nNeg, certMismatches, priceMismatches,
+       supTotal: supRows.length, stoTotal: stoDedup.length,
+       sup1ctDef, sto1ctDef, getCarat, getColor, getShape, getSupQty, getStoQty});
+
+    setProgress(100, steps.map((s,i) => ({...s, state:'done'})));
+    xlsxResult = wb;
+
+    // render UI
+    renderStats(nMatch, nMissing, nExtra, nNeg, certMismatches, priceMismatches,
+                supRows.length, stoDedup.length, sup1ctDef, sto1ctDef);
+    renderTable('table-all', ssAll);
+    renderTable('table-def', ssDef);
+
+    document.getElementById('result-section').classList.add('visible');
+    document.getElementById('dl-btn').onclick = downloadExcel;
+
+  } catch(err) {
+    showError('处理出错：' + err.message);
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+    spinner.classList.remove('visible');
+    runText.textContent = '▶ 生成对账报告 Generate Report';
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// RENDER STATS
+// ════════════════════════════════════════════════════════════
+function renderStats(nMatch, nMissing, nExtra, nNeg, certM, priceM, supT, stoT, s1ct, st1ct) {
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="stat-card">
+      <div class="s-label">供应商总数 Supplier</div>
+      <div class="s-value c-accent">${supT.toLocaleString()}</div>
+    </div>
+    <div class="stat-card">
+      <div class="s-label">商店总数 Store</div>
+      <div class="s-value c-accent">${stoT.toLocaleString()}</div>
+    </div>
+    <div class="stat-card">
+      <div class="s-label">匹配 Matched</div>
+      <div class="s-value c-green">${nMatch.toLocaleString()}</div>
+    </div>
+    <div class="stat-card">
+      <div class="s-label">差值 Difference</div>
+      <div class="s-value ${supT-stoT>0?'c-orange':supT-stoT<0?'c-yellow':'c-green'}">${(supT-stoT>0?'+':'')+(supT-stoT)}</div>
+    </div>
+  `;
+  document.getElementById('stats-row2').innerHTML = `
+    <div class="mini-stat">
+      <span class="ms-label">⚠️ 缺失 Missing (Supplier Only)</span>
+      <span class="ms-val c-yellow">${nMissing}</span>
+    </div>
+    <div class="mini-stat">
+      <span class="ms-label">🔴 多余 Extra (Store Only)</span>
+      <span class="ms-val c-orange">${nExtra}</span>
+    </div>
+    <div class="mini-stat">
+      <span class="ms-label">🔐 CVD证书不一致</span>
+      <span class="ms-val ${certM>0?'c-red':'c-green'}">${certM}</span>
+    </div>
+    <div class="mini-stat">
+      <span class="ms-label">💰 价格不一致 (>$0.50)</span>
+      <span class="ms-val ${priceM>0?'c-red':'c-green'}">${priceM}</span>
+    </div>
+    <div class="mini-stat">
+      <span class="ms-label">💎 1ct+ DEF 供应商</span>
+      <span class="ms-val c-accent">${s1ct.toLocaleString()}</span>
+    </div>
+    <div class="mini-stat">
+      <span class="ms-label">💎 1ct+ DEF 商店</span>
+      <span class="ms-val c-accent">${st1ct.toLocaleString()}</span>
+    </div>
+  `;
+}
+
+// ════════════════════════════════════════════════════════════
+// RENDER TABLE
+// ════════════════════════════════════════════════════════════
+function renderTable(id, ss) {
+  const totSup = ss.reduce((a,r)=>a+r.sup,0);
+  const totSto = ss.reduce((a,r)=>a+r.sto,0);
+  const totDif = totSup - totSto;
+
+  const rows = ss.map(r => {
+    const dc = r.diff>0?'diff-pos':r.diff<0?'diff-neg':'diff-zero';
+    const sign = r.diff>0?'+':'';
+    return `<tr>
+      <td>${r.shape}</td>
+      <td>${r.sup}</td>
+      <td>${r.sto}</td>
+      <td class="${dc}">${sign}${r.diff}</td>
+    </tr>`;
+  }).join('');
+
+  const totDc = totDif>0?'diff-pos':totDif<0?'diff-neg':'diff-zero';
+  document.getElementById(id).innerHTML = `
+    <div class="table-header">📊 ${ss.filter(r=>r.sup>0||r.sto>0).length} / ${TARGET_SHAPES.length} 种形状有库存</div>
+    <table>
+      <thead><tr><th>形状 Shape</th><th>供应商 Supplier</th><th>商店 Store</th><th>差值 Diff</th></tr></thead>
+      <tbody>
+        ${rows}
+        <tr class="total-row">
+          <td>合计 Total</td>
+          <td>${totSup}</td>
+          <td>${totSto}</td>
+          <td class="${totDc}">${totDif>0?'+':''}${totDif}</td>
+        </tr>
+      </tbody>
+    </table>`;
+}
+
+// ════════════════════════════════════════════════════════════
+// BUILD EXCEL
+// ════════════════════════════════════════════════════════════
+function buildExcel(allRows, rows1ctDef, ssAll, ssDef, meta) {
+  const {nMatch, nMissing, nExtra, nNeg, certMismatches, priceMismatches,
+         supTotal, stoTotal, sup1ctDef, sto1ctDef, getCarat, getColor, getShape, getSupQty, getStoQty} = meta;
+
+  const wb = XLSX.utils.book_new();
+
+  // ── Sheet 1: Shape Summary ──
+  const ss1 = buildShapeSheet(ssAll, ssDef, supTotal, stoTotal, sup1ctDef, sto1ctDef);
+  XLSX.utils.book_append_sheet(wb, ss1, '形状汇总 Shape Summary');
+
+  // ── Sheet 2: Full Detail ──
+  const detail = buildDetailSheet(allRows, getCarat, getColor, getShape, getSupQty, getStoQty,
+    nMatch, nMissing, nExtra, nNeg, certMismatches, priceMismatches);
+  XLSX.utils.book_append_sheet(wb, detail, '完整对账表 Full Detail');
+
+  // ── Sheet 3: 1ct+ DEF ──
+  const detail1ct = buildDetailSheet(rows1ctDef, getCarat, getColor, getShape, getSupQty, getStoQty,
+    null, null, null, null, null, null, true);
+  XLSX.utils.book_append_sheet(wb, detail1ct, '1ct+ DEF明细');
+
+  // ── Sheet 4: Shape Mapping ──
+  const mapData = [
+    ['供应商形状 Supplier Shape','商店形状 Store Shape','标准形状 Normalized Shape'],
+    ['Oval-M','Oval','Oval'],
+    ['Long Cushion','Cushion','Cushion'],
+    ['Step Cut Oval','Oval Modified Step','Step Cut Oval'],
+    ['Step Cut Pear','Pear Modified Step','Step Cut Pear'],
+    ['Step Cut Marquise','Marquise Modified Step','Step Cut Marquise'],
+    ['Old Mine Oval','Old Mine Oval','Old Mine Oval'],
+    ['Old Mine Pear','Old Mine Pear','Old Mine Pear'],
+    ['Oval (Rose)','Oval Rose Cut','Oval Rose Cut'],
+    ['Round (Rose)','Round Rose Cut','Round Rose Cut'],
+  ];
+  const mapWs = XLSX.utils.aoa_to_sheet(mapData);
+  mapWs['!cols'] = [{wch:28},{wch:28},{wch:28}];
+  XLSX.utils.book_append_sheet(wb, mapWs, '形状映射 Shape Mapping');
+
+  // ── Sheet 5: Notes ──
+  const notesData = [
+    ['说明项','内容'],
+    ['地区筛选 Location','SURAT + INDIA + HONG KONG（含 Hong kong）'],
+    ['匹配方式 Match Key','供应商 Ref.No. 与商店 SKU 均去掉所有连字符后转小写比对'],
+    ['形状归一化','供应商和商店两端形状名称统一映射为标准形状后比对（见"形状映射"Sheet）'],
+    ['目标形状 Target Shapes','10种主形状 + 7种特殊切工形状，共17种'],
+    ['1ct+ DEF筛选','Carat ≥ 1.00ct & Color ∈ D / E / F'],
+    ['CVD证书比对','仅对 Grown=CVD 的匹配产品；从两边URL提取r=参数值比较；不一致时证书链接高亮'],
+    ['价格比对','供应商$/ct. vs 商店price_per_carat；差值 > $0.50 时高亮'],
+    ['✅ 匹配 Matched','供应商与商店均有记录'],
+    ['⚠️ 缺失 Missing','供应商有，商店无对应SKU'],
+    ['🔴 多余 Extra','商店有，供应商无对应货号'],
+    ['数量差 Difference','供应商数量 − 商店数量（正=供应商多，负=商店多）'],
+  ];
+  const notesWs = XLSX.utils.aoa_to_sheet(notesData);
+  notesWs['!cols'] = [{wch:32},{wch:60}];
+  XLSX.utils.book_append_sheet(wb, notesWs, '说明 Notes');
+
+  return wb;
+}
+
+function buildShapeSheet(ssAll, ssDef, supTotal, stoTotal, sup1ct, sto1ct) {
+  const aoa = [];
+  aoa.push(['库存对账报告 — 形状汇总 / Shape Summary']);
+  aoa.push([`供应商 Supplier: ${supTotal}件  |  商店 Store: ${stoTotal}件  |  日期: ${new Date().toISOString().slice(0,10)}`]);
+  aoa.push([]);
+  aoa.push(['形状 Shape','供应商数量 Supplier Qty','商店数量 Store Qty','数量差 Difference']);
+  for(const r of ssAll) {
+    aoa.push([r.shape, r.sup, r.sto, r.sup-r.sto]);
+  }
+  const totS = ssAll.reduce((a,r)=>a+r.sup,0);
+  const totSt= ssAll.reduce((a,r)=>a+r.sto,0);
+  aoa.push(['合计 Total', totS, totSt, totS-totSt]);
+  aoa.push([]);
+  aoa.push([`1ct以上 DEF色汇总  |  供应商 ${sup1ct}件  |  商店 ${sto1ct}件`]);
+  aoa.push([]);
+  aoa.push(['形状 Shape','供应商数量 Supplier Qty','商店数量 Store Qty','数量差 Difference']);
+  for(const r of ssDef) {
+    aoa.push([r.shape, r.sup, r.sto, r.sup-r.sto]);
+  }
+  const tot1S = ssDef.reduce((a,r)=>a+r.sup,0);
+  const tot1St= ssDef.reduce((a,r)=>a+r.sto,0);
+  aoa.push(['合计 Total', tot1S, tot1St, tot1S-tot1St]);
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{wch:26},{wch:22},{wch:20},{wch:18}];
+  return ws;
+}
+
+function buildDetailSheet(rows, getCarat, getColor, getShape, getSupQty, getStoQty,
+  nMatch, nMissing, nExtra, nNeg, certM, priceM, is1ct=false) {
+  const headers = [
+    '供应商货号 Supplier Ref.No.','供应商SKU(无连字符) Supplier SKU',
+    '克拉数 Carat','颜色 Color','供应商形状 Supplier Shape','标准形状 Normalized Shape',
+    '供应商地区 Supplier Location','供应商证书号 Supplier Certi.No.',
+    '供应商证书链接 Supplier Certilink','供应商$/ct. Supplier Price/ct',
+    '商店SKU Store SKU','商店报告号 Store Report No.',
+    '商店证书链接 Store Certificate File','商店$/ct. Store Price/ct',
+    '供应商数量 Supplier Qty','商店数量 Store Qty','数量差 Difference','状态 Status'
+  ];
+
+  const statusOrder = {
+    'neg':0,'missing':1,'extra':2,'matched':3
+  };
+
+  const processed = rows.map(r => {
+    const supQty = getSupQty(r);
+    const stoQty = getStoQty(r);
+    const diff   = supQty - stoQty;
+    let status = r.type==='matched' ? (stoQty<0?'负库存 Negative Inventory':'匹配 Matched')
+               : r.type==='missing' ? '缺失产品 Missing (Supplier Only)'
+               : '多余产品 Extra (Store Only)';
+    return {
+      r, supQty, stoQty, diff, status,
+      sortKey: r.type==='matched'&&stoQty<0?0 : r.type==='missing'?1 : r.type==='extra'?2 : 3
+    };
+  }).sort((a,b) => a.sortKey - b.sortKey || getShape(a.r).localeCompare(getShape(b.r)));
+
+  const aoa = [];
+  if(!is1ct && nMatch!==null) {
+    aoa.push([`✅ 匹配: ${nMatch}  |  ⚠️ 缺失: ${nMissing}  |  🔴 多余: ${nExtra}  |  CVD证书不一致: ${certM}  |  价格不一致: ${priceM}`]);
+  }
+  aoa.push(headers);
+
+  for(const {r, supQty, stoQty, diff, status} of processed) {
+    const sup = r.sup, sto = r.sto;
+    aoa.push([
+      sup ? String(sup['Ref.No.']||'') : '',
+      sup ? normRef(sup['Ref.No.']||'') : '',
+      getCarat(r) !== null ? getCarat(r) : '',
+      getColor(r),
+      sup ? String(sup.Shape||'') : '',
+      getShape(r),
+      sup ? String(sup.Location||'') : '',
+      sup ? safeCerti(sup['Certi.No.']) : '',
+      sup ? String(sup.Certilink||'') : '',
+      sup ? (fmtPrice(sup['$/ct.']) ?? '') : '',
+      sto ? String(sto[SKU_COL]||'') : '',
+      sto ? String(sto[REPORT_COL]||'') : '',
+      sto ? String(sto[CERT_COL]||'') : '',
+      sto ? (fmtPrice(sto[PPC_COL]) ?? '') : '',
+      supQty, stoQty, diff, status
+    ]);
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [22,22,8,8,18,20,14,20,40,14,18,18,40,14,12,12,12,30].map(w=>({wch:w}));
+  return ws;
+}
+
+// ════════════════════════════════════════════════════════════
+// DOWNLOAD
+// ════════════════════════════════════════════════════════════
+function downloadExcel() {
+  if(!xlsxResult) return;
+  const date = new Date().toISOString().slice(0,10).replace(/-/g,'');
+  XLSX.writeFile(xlsxResult, `inventory_reconciliation_${date}.xlsx`);
+}
+</script>
+</body>
+</html>
