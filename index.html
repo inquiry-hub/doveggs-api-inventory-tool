@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DovEggs 内部工具中心</title>
+<style>
+  :root {
+    --gold: #C9A84C;
+    --gold-light: #E8C97A;
+    --gold-dim: rgba(201,168,76,0.12);
+    --bg: #0A0A0A;
+    --bg2: #141414;
+    --bg3: #1C1C1C;
+    --border: #262626;
+    --text: #F0EDE8;
+    --text-muted: #777770;
+    --text-sub: #555550;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .top-bar {
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  }
+  header {
+    padding: 48px 40px 32px;
+    text-align: center;
+  }
+  .brand {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 16px;
+    opacity: 0.8;
+  }
+  h1 {
+    font-size: 32px;
+    font-weight: 300;
+    letter-spacing: 0.06em;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+  h1 strong { font-weight: 700; color: var(--gold-light); }
+  .subtitle { font-size: 13px; color: var(--text-muted); letter-spacing: 0.04em; }
+  .divider { width: 48px; height: 1px; background: var(--gold); margin: 24px auto; opacity: 0.4; }
+  .grid {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 40px 60px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+  }
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .card:hover { border-color: rgba(201,168,76,0.35); background: var(--bg3); transform: translateY(-2px); box-shadow: 0 12px 32px rgba(0,0,0,0.4); }
+  .card:hover::before { opacity: 1; }
+  .card-icon { font-size: 28px; width: 52px; height: 52px; background: var(--gold-dim); border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+  .card-tag { position: absolute; top: 20px; right: 20px; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 8px; border-radius: 20px; border: 1px solid; }
+  .tag-active { color: #5EA87A; border-color: rgba(94,168,122,0.3); background: rgba(94,168,122,0.08); }
+  .tag-new    { color: var(--gold); border-color: rgba(201,168,76,0.3); background: var(--gold-dim); }
+  .tag-soon   { color: var(--text-muted); border-color: var(--border); background: transparent; }
+  .card-title { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: 0.02em; }
+  .card-desc { font-size: 13px; color: var(--text-muted); line-height: 1.65; flex: 1; }
+  .card-footer { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-sub); padding-top: 12px; border-top: 1px solid var(--border); }
+  .card-footer .arrow { margin-left: auto; color: var(--gold); font-size: 14px; opacity: 0; transition: opacity 0.15s, transform 0.15s; transform: translateX(-4px); }
+  .card:hover .arrow { opacity: 1; transform: translateX(0); }
+  .card.disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
+  footer { margin-top: auto; padding: 24px 40px; text-align: center; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-sub); letter-spacing: 0.04em; }
+  footer span { color: var(--gold); opacity: 0.6; }
+</style>
+</head>
+<body>
+
+<div class="top-bar"></div>
+
+<header>
+  <div class="brand">DovEggs · Internal Tools</div>
+  <h1>内部工具<strong>中心</strong></h1>
+  <p class="subtitle">供内部团队使用 · 所有数据均在本地处理，不上传服务器</p>
+  <div class="divider"></div>
+</header>
+
+<div class="grid">
+
+  <a class="card" href="./classic-api-inventory.html">
+    <span class="card-tag tag-active">运行中</span>
+    <div class="card-icon">📦</div>
+    <div class="card-title">库存对账工具</div>
+    <div class="card-desc">上传库存文件与订单数据，自动核对差异，生成对账报告，快速定位库存缺口。</div>
+    <div class="card-footer">
+      <span>库存管理</span>
+      <span class="arrow">→</span>
+    </div>
+  </a>
+
+  <a class="card" href="./order-tool.html">
+    <span class="card-tag tag-new">新上线</span>
+    <div class="card-icon">💎</div>
+    <div class="card-title">工厂定制订单整理</div>
+    <div class="card-desc">上传 Shopify Export 文件，自动解析石头大小、戒托材质、字印、圈号等字段，一键下载工厂订单 xlsx。</div>
+    <div class="card-footer">
+      <span>订单处理</span>
+      <span class="arrow">→</span>
+    </div>
+  </a>
+
+  <div class="card disabled">
+    <span class="card-tag tag-soon">即将上线</span>
+    <div class="card-icon">📊</div>
+    <div class="card-title">销售数据看板</div>
+    <div class="card-desc">订单趋势、SKU 销量分析、客单价统计，辅助运营决策。</div>
+    <div class="card-footer">
+      <span>数据分析</span>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  DovEggs Internal Tools &nbsp;<span>·</span>&nbsp; 数据本地处理，安全可靠
+</footer>
+
+</body>
+</html>
