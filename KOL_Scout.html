@@ -439,7 +439,8 @@ async function fetchYTChannel(url){
       (sd.items||[]).forEach(v=>{ aV+=+v.statistics.viewCount||0; aL+=+v.statistics.likeCount||0; aC+=+v.statistics.commentCount||0; n++; });
       if(n){ aV=Math.round(aV/n); aL=Math.round(aL/n); aC=Math.round(aC/n); }
     }
-    return { subscribers:+stats.subscriberCount||0, avgViews:aV, avgLikes:aL, avgComments:aC, extractedEmail };
+    const country=cd.items[0].snippet?.country||'';
+    return { subscribers:+stats.subscriberCount||0, avgViews:aV, avgLikes:aL, avgComments:aC, extractedEmail, country };
   } catch(e){ return {error:e.message}; }
 }
 
@@ -493,6 +494,15 @@ async function addCreator(){
         setStatus('discoverStatus','✓ YouTube 数据已自动获取（近10条视频均值）· 邮箱已从简介提取：'+d.extractedEmail,'success');
       } else {
         setStatus('discoverStatus','✓ YouTube 数据已自动获取（近10条视频均值）· 简介中未发现邮箱','success');
+      }
+      // Auto-fill country if available and field is empty
+      if(d.country){
+        const countryField=document.getElementById('inCountry');
+        if(!countryField.value.trim()){
+          countryField.value=d.country;
+          countryField.style.borderColor='var(--green)';
+          setTimeout(()=>countryField.style.borderColor='',2500);
+        }
       }
     }
     else if(d?.error==='no_key') setStatus('discoverStatus','API Key 未配置，使用手动数据','info');
