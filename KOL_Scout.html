@@ -25,7 +25,7 @@ header span{font-family:'Arial',monospace;font-size:.65rem;color:var(--tx3);lett
 
 /* PANEL */
 .panel{background:var(--s);border:1px solid var(--bd);border-radius:12px;padding:1.8rem;margin-bottom:1.5rem}
-.panel-title{font-family:'Arial',monospace;font-size:.65rem;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);margin-bottom:1.2rem;display:flex;align-items:center;gap:.5rem}
+.panel-title{font-family:'Arial',monospace;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);margin-bottom:1.2rem;display:flex;align-items:center;gap:.5rem}
 .panel-title::before{content:'';display:block;width:16px;height:1px;background:var(--gold)}
 
 /* GRID */
@@ -35,10 +35,10 @@ header span{font-family:'Arial',monospace;font-size:.65rem;color:var(--tx3);lett
 .g13{display:grid;grid-template-columns:3fr 1fr;gap:.8rem}
 .g31{display:grid;grid-template-columns:1fr 3fr;gap:.8rem}
 .field{display:flex;flex-direction:column;gap:.35rem}
-label{font-size:.78rem;color:#b0a898;color:#9a9080;font-family:'Arial',monospace;letter-spacing:.08em;text-transform:uppercase}
+label{font-size:.76rem;color:#b0a898;font-family:'Arial',monospace;letter-spacing:.08em;text-transform:uppercase}
 input,select,textarea{background:var(--s2);border:1px solid var(--bd2);border-radius:6px;color:var(--tx);font-family:'Arial',monospace;font-size:.8rem;padding:.55rem .85rem;outline:none;transition:border-color .2s;width:100%}
 input:focus,select:focus,textarea:focus{border-color:var(--gold)}
-input::placeholder{color:#6a6560}
+input::placeholder{color:#6a6358}
 select option{background:var(--s2)}
 textarea{resize:vertical;min-height:70px;font-size:.76rem;line-height:1.6}
 
@@ -72,7 +72,7 @@ textarea{resize:vertical;min-height:70px;font-size:.76rem;line-height:1.6}
 /* TABLE */
 .table-wrap{background:var(--s);border:1px solid var(--bd);border-radius:12px;overflow:hidden}
 .table-header{padding:.9rem 1.4rem;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
-.table-header-title{font-family:'Arial',monospace;font-size:.65rem;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);display:flex;align-items:center;gap:.5rem}
+.table-header-title{font-family:'Arial',monospace;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);display:flex;align-items:center;gap:.5rem}
 .table-header-title::before{content:'';display:block;width:16px;height:1px;background:var(--gold)}
 .table-actions{display:flex;gap:.6rem;flex-wrap:wrap}
 table{width:100%;border-collapse:collapse;font-size:.78rem}
@@ -103,6 +103,11 @@ td.name-cell a:hover{color:var(--gold2)}
 .empty-state p{font-family:'Arial',monospace;font-size:.72rem;letter-spacing:.08em}
 .spinner{display:inline-block;width:11px;height:11px;border:1.5px solid var(--bd2);border-top-color:var(--gold);border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+.copyable-link{cursor:pointer;text-decoration:underline dotted;transition:color .15s}
+.copyable-link:hover{color:var(--gold2)}
+.copy-toast{position:fixed;bottom:1.5rem;right:1.5rem;background:#0d1f14;border:1px solid #1e4030;color:var(--green);font-family:'Arial',monospace;font-size:.74rem;padding:.6rem 1.1rem;border-radius:6px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:9999}
+.copy-toast.show{opacity:1}
+
 
 /* UTM */
 .utm-result{background:#12100e;border:1px solid var(--bd);border-radius:6px;padding:.8rem 1rem;font-family:'Arial',monospace;font-size:.74rem;color:var(--blue);word-break:break-all;line-height:1.5;margin-top:.8rem}
@@ -116,7 +121,7 @@ td.name-cell a:hover{color:var(--gold2)}
 .post-creator{font-weight:600;color:var(--tx)}
 .post-metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:.5rem;margin-top:.6rem}
 .metric-box{background:var(--s);border:1px solid var(--bd);border-radius:5px;padding:.45rem .6rem;text-align:center}
-.metric-label{font-family:'Arial',monospace;font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;color:#b0a898;margin-bottom:.2rem}
+.metric-label{font-family:'Arial',monospace;font-size:.68rem;text-transform:uppercase;letter-spacing:.07em;color:#b0a898;margin-bottom:.2rem}
 .metric-value{font-family:'Arial',monospace;font-size:.9rem;color:var(--tx)}
 .metric-value.highlight{color:var(--gold2)}
 
@@ -204,8 +209,6 @@ td.name-cell a:hover{color:var(--gold2)}
   <div class="field" style="margin-bottom:.8rem"><label>备注</label><textarea id="inNotes" placeholder="内容风格、合作评估、特别观察..."></textarea></div>
   <div class="action-row">
     <button class="btn btn-primary" id="addBtn" onclick="addCreator()"><span id="addBtnText">+ 添加并分析</span></button>
-    <button class="btn btn-green" onclick="exportLinksCSV()" style="font-size:.68rem;padding:.35rem .7rem">↓ 导出链接记录</button>
-    <button class="btn btn-ghost" onclick="clearLinks()" style="font-size:.68rem;padding:.35rem .7rem">清空</button>
     <button class="btn btn-ghost" onclick="clearForm()">清空表单</button>
     <button class="btn btn-green" onclick="exportCSV()" style="margin-left:auto">↓ 导出 Excel（对齐收集池格式）</button>
   </div>
@@ -350,7 +353,7 @@ td.name-cell a:hover{color:var(--gold2)}
 <div class="table-wrap">
   <div class="table-header">
     <div class="table-header-title">已生成链接记录</div>
-    <button class="btn btn-ghost" onclick="clearLinks()" style="font-size:.68rem;padding:.35rem .7rem">清空</button>
+    <button class="btn btn-green" onclick="exportLinksCSV()" style="font-size:.68rem;padding:.35rem .7rem">↓ 导出链接记录</button><button class="btn btn-ghost" onclick="clearLinks()" style="font-size:.68rem;padding:.35rem .7rem">清空</button>
   </div>
   <div id="linksContainer">
     <div class="empty-state"><div class="diamond">◇</div><p>尚未生成任何链接</p></div>
@@ -369,7 +372,7 @@ let links     = JSON.parse(localStorage.getItem('de_links')    || '[]');
 
 // ── API KEY ──
 const keyInput = document.getElementById('ytKey');
-let YT_KEY = localStorage.getItem('de_ytkey') || 'AIzaSyDbjhQkCQ0yMIenSD8FWJ2IVQbgjoFgoI4';
+let YT_KEY = localStorage.getItem('de_ytkey') || '';
 if (keyInput && YT_KEY) keyInput.value = YT_KEY;
 function saveKey(){ YT_KEY = keyInput.value.trim(); localStorage.setItem('de_ytkey', YT_KEY); }
 async function testKey(){
@@ -408,16 +411,24 @@ async function fetchYTChannel(url){
   const handle=hm?hm[1]:null, chId=im?im[1]:null;
   try{
     let cid=chId;
+    let description='';
     if(handle&&!cid){
       const r=await fetch(`https://www.googleapis.com/youtube/v3/channels?part=id,statistics,snippet&forHandle=${handle}&key=${YT_KEY}`);
       const d=await r.json();
-      if(d.items?.length){ cid=d.items[0].id; }
+      if(d.items?.length){
+        cid=d.items[0].id;
+        description=d.items[0].snippet?.description||'';
+      }
     }
     if(!cid) return {error:'not_found'};
     const cr=await fetch(`https://www.googleapis.com/youtube/v3/channels?part=statistics,snippet&id=${cid}&key=${YT_KEY}`);
     const cd=await cr.json();
     if(!cd.items?.length) return {error:'not_found'};
     const stats=cd.items[0].statistics;
+    if(!description) description=cd.items[0].snippet?.description||'';
+    // Extract email from description
+    const emailMatch=description.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
+    const extractedEmail=emailMatch?emailMatch[0]:'';
     const vr=await fetch(`https://www.googleapis.com/youtube/v3/search?part=id&channelId=${cid}&maxResults=10&order=date&type=video&key=${YT_KEY}`);
     const vd=await vr.json();
     const ids=(vd.items||[]).map(i=>i.id.videoId).filter(Boolean).join(',');
@@ -428,7 +439,7 @@ async function fetchYTChannel(url){
       (sd.items||[]).forEach(v=>{ aV+=+v.statistics.viewCount||0; aL+=+v.statistics.likeCount||0; aC+=+v.statistics.commentCount||0; n++; });
       if(n){ aV=Math.round(aV/n); aL=Math.round(aL/n); aC=Math.round(aC/n); }
     }
-    return { subscribers:+stats.subscriberCount||0, avgViews:aV, avgLikes:aL, avgComments:aC };
+    return { subscribers:+stats.subscriberCount||0, avgViews:aV, avgLikes:aL, avgComments:aC, extractedEmail };
   } catch(e){ return {error:e.message}; }
 }
 
@@ -469,7 +480,21 @@ async function addCreator(){
   if(platform==='YouTube'&&url){
     setStatus('discoverStatus','正在通过 YouTube API 获取数据...','info');
     const d=await fetchYTChannel(url);
-    if(d&&!d.error){ followers=d.subscribers||followers; avgViews=d.avgViews||avgViews; avgLikes=d.avgLikes; avgComments=d.avgComments; setStatus('discoverStatus','✓ YouTube 数据已自动获取（近10条视频均值）','success'); }
+    if(d&&!d.error){
+      followers=d.subscribers||followers; avgViews=d.avgViews||avgViews; avgLikes=d.avgLikes; avgComments=d.avgComments;
+      // Auto-fill email if found in description and field is empty
+      if(d.extractedEmail){
+        const emailField=document.getElementById('inEmail');
+        if(!emailField.value.trim()){
+          emailField.value=d.extractedEmail;
+          emailField.style.borderColor='var(--green)';
+          setTimeout(()=>emailField.style.borderColor='',2500);
+        }
+        setStatus('discoverStatus','✓ YouTube 数据已自动获取（近10条视频均值）· 邮箱已从简介提取：'+d.extractedEmail,'success');
+      } else {
+        setStatus('discoverStatus','✓ YouTube 数据已自动获取（近10条视频均值）· 简介中未发现邮箱','success');
+      }
+    }
     else if(d?.error==='no_key') setStatus('discoverStatus','API Key 未配置，使用手动数据','info');
     else setStatus('discoverStatus','API 获取失败，使用手动数据','info');
   }
@@ -658,15 +683,23 @@ async function generateShortLink(){
   clearStatus('utmStatus');
 }
 
+function showToast(){
+  const t=document.getElementById('copyToast');
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),1800);
+}
+function copyLink(text){
+  navigator.clipboard.writeText(text).then(()=>showToast());
+}
 function renderLinks(){
   const c=document.getElementById('linksContainer');
   if(!links.length){ c.innerHTML='<div class="empty-state"><div class="diamond">◇</div><p>尚未生成任何链接</p></div>'; return; }
   const rows=[...links].reverse().map(l=>`<tr>
     <td class="name-cell">${l.creator||'—'}</td>
     <td><span class="platform-badge ${bCls(l.platform)}">${l.platform}</span></td>
-    <td class="email-cell" style="max-width:200px;cursor:pointer" title="点击复制短链" onclick="copyCell(this,'${l.shortUrl.replace(/'/g,"\\'")}')"><span>${l.shortUrl}</span> <span style="font-size:.6rem;color:var(--tx3);margin-left:.3rem">⎘</span></td>
-    <td style="font-family:'DM Mono',monospace;font-size:.65rem;color:#9a9080;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" title="点击复制UTM链接" onclick="copyCell(this,'${l.utmUrl.replace(/'/g,"\\'")}')"><span>${l.utmUrl}</span> <span style="font-size:.6rem;color:var(--tx3);margin-left:.3rem">⎘</span></td>
-    <td style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--tx3)">${l.date}</td>
+    <td class="email-cell copyable-link" style="max-width:200px" onclick="copyLink('${l.shortUrl}')" title="点击复制短链">${l.shortUrl}</td>
+    <td style="font-family:'Arial',monospace;font-size:.72rem;color:#8a8070;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" class="copyable-link" onclick="copyLink('${l.utmUrl}')" title="点击复制UTM链接">${l.utmUrl}</td>
+    <td style="font-family:'Arial',monospace;font-size:.7rem;color:var(--tx3)">${l.date}</td>
     <td><button class="btn btn-danger" onclick="deleteLink(${l.id})">删除</button></td>
   </tr>`).join('');
   c.innerHTML=`<div style="overflow-x:auto"><table><thead><tr><th>达人</th><th>平台</th><th>短链（点击复制）</th><th>UTM 链接（点击复制）</th><th>日期</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
@@ -674,23 +707,7 @@ function renderLinks(){
 
 function deleteLink(id){ links=links.filter(l=>l.id!==id); saveL(); renderLinks(); }
 function clearLinks(){ if(!links.length)return; if(confirm('确认清空所有链接记录？')){ links=[]; saveL(); renderLinks(); } }
-function copyCell(el, text){
-  navigator.clipboard.writeText(text);
-  const orig=el.style.background;
-  el.style.background='#1a3020';
-  setTimeout(()=>{ el.style.background=orig; },800);
-}
 
-function exportLinksCSV(){
-  if(!links.length){ setStatus('utmStatus','没有数据可导出','error'); return; }
-  const headers=['达人','平台','短链','UTM链接','生成日期'];
-  const rows=links.map(l=>[l.creator||'',l.platform,l.shortUrl||'',l.utmUrl||'',l.date]);
-  const csv=[headers,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}));
-  a.download=`DovEggs_UTM链接_${new Date().toISOString().split('T')[0]}.csv`;
-  a.click();
-}
 function copyText(id){
   const el=document.getElementById(id);
   navigator.clipboard.writeText(el.textContent.replace(' (别名已占用，使用随机短链)',''));
@@ -701,11 +718,24 @@ function copyText(id){
 // ── STORAGE ──
 function save(){ localStorage.setItem('de_creators', JSON.stringify(creators)); }
 function saveP(){ localStorage.setItem('de_posts', JSON.stringify(posts)); }
+function exportLinksCSV(){
+  if(!links.length){ setStatus('utmStatus','没有链接记录可导出','error'); return; }
+  const headers=['达人','平台','短链','UTM完整链接','生成日期'];
+  const rows=links.map(l=>[l.creator||'',l.platform||'',l.shortUrl||'',l.utmUrl||'',l.date||'']);
+  const csv=[headers,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}));
+  a.download=`DovEggs_KOL链接记录_${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
+  setStatus('utmStatus','✓ 链接记录已导出','success');
+  setTimeout(()=>{ const el=document.getElementById('utmStatus'); if(el) el.className='status-bar'; },3000);
+}
 function saveL(){ localStorage.setItem('de_links', JSON.stringify(links)); }
 
 // ── INIT ──
 renderTable(); updateStats(); renderPosts(); renderLinks();
 document.getElementById('inDate').value=new Date().toISOString().split('T')[0];
 </script>
+<div class="copy-toast" id="copyToast">已复制 ✓</div>
 </body>
 </html>
