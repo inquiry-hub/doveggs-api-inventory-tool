@@ -372,7 +372,7 @@ let links     = JSON.parse(localStorage.getItem('de_links')    || '[]');
 
 // ── API KEY ──
 const keyInput = document.getElementById('ytKey');
-let YT_KEY = localStorage.getItem('de_ytkey') || '';
+let YT_KEY = localStorage.getItem('de_ytkey') || 'AIzaSyDbjhQkCQ0yMIenSD8FWJ2IVQbgjoFgoI4';
 if (keyInput && YT_KEY) keyInput.value = YT_KEY;
 function saveKey(){ YT_KEY = keyInput.value.trim(); localStorage.setItem('de_ytkey', YT_KEY); }
 async function testKey(){
