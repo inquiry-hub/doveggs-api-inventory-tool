@@ -347,7 +347,6 @@
     background: rgba(79,124,255,.18);
     border-color: var(--accent);
   }
-  .loc-check-item input[type=checkbox] { display: none; }
   .loc-check-item .check-icon {
     width: 14px; height: 14px; border-radius: 3px;
     border: 1.5px solid var(--border2);
@@ -441,7 +440,7 @@
     <h1>库存对账工具</h1>
     <p>Inventory Reconciliation · Doveggs</p>
   </div>
-  <span class="badge">v1.9</span>
+  <span class="badge">v1.9.1</span>
 </header>
 
 <main>
@@ -495,41 +494,34 @@
     <div class="section-label" style="margin-bottom:8px">地区筛选 Location Filter</div>
     <div style="font-size:11px;color:var(--text3);margin-bottom:8px">选择纳入对账和价格分析的供应商地区（多选）</div>
     <div class="loc-check-group" id="loc-check-group">
-      <label class="loc-check-item checked" data-loc="HONG KONG" onclick="toggleLoc(this)">
-        <input type="checkbox" checked>
+      <div class="loc-check-item checked" data-loc="HONG KONG" onclick="toggleLoc(this)">
         <span class="check-icon">✓</span>
         <span class="check-label">Hong Kong</span>
-      </label>
-      <label class="loc-check-item checked" data-loc="INDIA" onclick="toggleLoc(this)">
-        <input type="checkbox" checked>
+      </div>
+      <div class="loc-check-item checked" data-loc="INDIA" onclick="toggleLoc(this)">
         <span class="check-icon">✓</span>
         <span class="check-label">India</span>
-      </label>
-      <label class="loc-check-item checked" data-loc="SURAT" onclick="toggleLoc(this)">
-        <input type="checkbox" checked>
+      </div>
+      <div class="loc-check-item checked" data-loc="SURAT" onclick="toggleLoc(this)">
         <span class="check-icon">✓</span>
         <span class="check-label">Surat</span>
-      </label>
-      <label class="loc-check-item" data-loc="LONDON" onclick="toggleLoc(this)">
-        <input type="checkbox">
+      </div>
+      <div class="loc-check-item" data-loc="LONDON" onclick="toggleLoc(this)">
         <span class="check-icon"></span>
         <span class="check-label">London</span>
-      </label>
-      <label class="loc-check-item" data-loc="ANTWERP" onclick="toggleLoc(this)">
-        <input type="checkbox">
+      </div>
+      <div class="loc-check-item" data-loc="ANTWERP" onclick="toggleLoc(this)">
         <span class="check-icon"></span>
         <span class="check-label">Antwerp</span>
-      </label>
-      <label class="loc-check-item" data-loc="NEW YORK" onclick="toggleLoc(this)">
-        <input type="checkbox">
+      </div>
+      <div class="loc-check-item" data-loc="NEW YORK" onclick="toggleLoc(this)">
         <span class="check-icon"></span>
         <span class="check-label">New York</span>
-      </label>
-      <label class="loc-check-item" data-loc="DUBAI" onclick="toggleLoc(this)">
-        <input type="checkbox">
+      </div>
+      <div class="loc-check-item" data-loc="DUBAI" onclick="toggleLoc(this)">
         <span class="check-icon"></span>
         <span class="check-label">Dubai</span>
-      </label>
+      </div>
       <span class="loc-select-all" onclick="selectAllLocs(true)">全选</span>
       <span class="loc-select-all" onclick="selectAllLocs(false)">清空</span>
     </div>
@@ -608,7 +600,7 @@
 
 </main>
 
-<footer>Doveggs Inventory Reconciliation Tool · v1.9 · 数据在本地处理，不上传服务器</footer>
+<footer>Doveggs Inventory Reconciliation Tool · v1.9.1 · 数据在本地处理，不上传服务器</footer>
 
 <script>
 
@@ -714,9 +706,15 @@ function setPriceTabFn(t) { setPriceTab(t); }
 // LOCATION SELECTOR
 // ════════════════════════════════════════════════════════════
 function toggleLoc(el) {
-  el.classList.toggle('checked');
-  const icon = el.querySelector('.check-icon');
-  icon.textContent = el.classList.contains('checked') ? '✓' : '';
+  // Simple toggle — no input checkbox involved, pure class-based state
+  const isChecked = el.classList.contains('checked');
+  if(isChecked) {
+    el.classList.remove('checked');
+    el.querySelector('.check-icon').textContent = '';
+  } else {
+    el.classList.add('checked');
+    el.querySelector('.check-icon').textContent = '✓';
+  }
 }
 
 function selectAllLocs(checked) {
