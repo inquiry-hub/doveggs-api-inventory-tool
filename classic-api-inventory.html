@@ -441,7 +441,7 @@
     <h1>库存对账工具</h1>
     <p>Inventory Reconciliation · Doveggs</p>
   </div>
-  <span class="badge">v1.8</span>
+  <span class="badge">v1.9</span>
 </header>
 
 <main>
@@ -541,7 +541,7 @@
   <!-- RUN -->
   <button class="run-btn" id="run-btn" onclick="runReconciliation()">
     <div class="spinner" id="spinner"></div>
-    <span id="run-text">▶ 生成对账报告 Generate Report</span>
+    <span id="run-text">▶ 生成报告 Generate Report</span>
   </button>
 
   <!-- PROGRESS -->
@@ -556,16 +556,19 @@
 
   <!-- RESULT -->
   <div id="result-section">
-    <div class="section-label">对账摘要 Summary</div>
+    <!-- RECONCILIATION SECTION (hidden when no store file) -->
+    <div id="reconcile-section">
+      <div class="section-label">对账摘要 Summary</div>
 
-    <div class="stats-grid" id="stats-grid"></div>
-    <div class="stats-row2" id="stats-row2"></div>
+      <div class="stats-grid" id="stats-grid"></div>
+      <div class="stats-row2" id="stats-row2"></div>
 
-    <div class="section-label">形状汇总（总览）Shape Summary — All</div>
-    <div class="table-wrap" id="table-all"></div>
+      <div class="section-label">形状汇总（总览）Shape Summary — All</div>
+      <div class="table-wrap" id="table-all"></div>
 
-    <div class="section-label" style="margin-top:24px">形状汇总（1ct+ DEF色）Shape Summary — ≥1ct D/E/F</div>
-    <div class="table-wrap" id="table-def"></div>
+      <div class="section-label" style="margin-top:24px">形状汇总（1ct+ DEF色）Shape Summary — ≥1ct D/E/F</div>
+      <div class="table-wrap" id="table-def"></div>
+    </div>
 
 
     <!-- PRICE ANALYSIS -->
@@ -605,7 +608,7 @@
 
 </main>
 
-<footer>Doveggs Inventory Reconciliation Tool · v1.8 · 数据在本地处理，不上传服务器</footer>
+<footer>Doveggs Inventory Reconciliation Tool · v1.9 · 数据在本地处理，不上传服务器</footer>
 
 <script>
 
@@ -861,9 +864,18 @@ function fmtPrice(v) {
 // ════════════════════════════════════════════════════════════
 async function runReconciliation() {
   clearError();
-  if(!supFile) { showError('请上传供应商库存表'); return; }
-  if(!stoFile) { showError('请上传商店库存表');   return; }
+  // Determine run mode based on uploaded files
+  const hasSupNew = !!supFile;
+  const hasSto    = !!stoFile;
+  const hasSupOld = !!oldSupFile;
+
+  if(!hasSupNew) { showError('请至少上传供应商库存表 Supplier file is required'); return; }
+  if(!hasSto && !hasSupOld) { showError('请上传商店库存表（对账）或旧版供应商表（价格分析），或两者都上传'); return; }
   if(getSelectedLocs().size === 0) { showError('请至少选择一个地区 Please select at least one location'); return; }
+
+  // Mode flags
+  const doReconcile = hasSupNew && hasSto;      // inventory reconciliation
+  const doPriceAnalysis = hasSupNew;            // price analysis (always when supplier present)
 
   const btn = document.getElementById('run-btn');
   const spinner = document.getElementById('spinner');
@@ -902,7 +914,7 @@ async function runReconciliation() {
 
     // Step 1
     markStep(1);
-    const stoWb = await readXlsx(stoFile);
+    const stoWb = hasSto ? await readXlsx(stoFile) : null;
 
     // Step 2 — Filter supplier
     markStep(2);
@@ -956,63 +968,64 @@ async function runReconciliation() {
       r._certiClean = safeCerti(r['Certi.No.']);
     });
 
-    // Step 2b — Filter store
-    let stoSheetName = stoWb.SheetNames.includes('Products') ? 'Products' : stoWb.SheetNames[0];
-    let stoRows = sheetToRows(stoWb, stoSheetName);
-    stoRows = stoRows.filter(r => String(r.Status||'').toLowerCase().trim() !== 'draft');
-
-    const stoShapeNorm = r => normStoShape(String(r[SHAPE_COL]||'').trim());
-    stoRows = stoRows.filter(r => TARGET_SHAPES.includes(stoShapeNorm(r)));
-
-    // dedup by SKU
-    const seenSku = new Set();
-    const stoDedup = [];
-    for(const r of stoRows) {
-      const sku = r[SKU_COL];
-      if(!sku) continue;
-      const norm = normSku(sku);
-      if(seenSku.has(norm)) continue;
-      seenSku.add(norm);
-      stoDedup.push({
-        ...r,
-        _skuNorm:    norm,
-        _shapeNorm:  stoShapeNorm(r),
-        _certNumSto: extractCertNum(r[CERT_COL]),
-        _ppcSto:     parseFloat(r[PPC_COL]) || null,
-      });
-    }
-
-    // Step 3 — Match
-    markStep(3);
-    const stoMap = new Map(stoDedup.map(r => [r._skuNorm, r]));
-
-    const matched   = [];
-    const missingRows = []; // supplier only
-    for(const sr of supRows) {
-      const sm = stoMap.get(sr._refNorm);
-      if(sm) {
-        matched.push({sup: sr, sto: sm, type:'matched'});
-        stoMap.delete(sr._refNorm);
-      } else {
-        missingRows.push({sup: sr, sto: null, type:'missing'});
+    // Step 2b — Filter store (only if store file uploaded)
+    let stoDedup = [];
+    if(hasSto) {
+      let stoSheetName = stoWb.SheetNames.includes('Products') ? 'Products' : stoWb.SheetNames[0];
+      let stoRows = sheetToRows(stoWb, stoSheetName);
+      stoRows = stoRows.filter(r => String(r.Status||'').toLowerCase().trim() !== 'draft');
+      const stoShapeNorm = r => normStoShape(String(r[SHAPE_COL]||'').trim());
+      stoRows = stoRows.filter(r => TARGET_SHAPES.includes(stoShapeNorm(r)));
+      const seenSku = new Set();
+      for(const r of stoRows) {
+        const sku = r[SKU_COL];
+        if(!sku) continue;
+        const norm = normSku(sku);
+        if(seenSku.has(norm)) continue;
+        seenSku.add(norm);
+        stoDedup.push({
+          ...r,
+          _skuNorm:    norm,
+          _shapeNorm:  stoShapeNorm(r),
+          _certNumSto: extractCertNum(r[CERT_COL]),
+          _ppcSto:     parseFloat(r[PPC_COL]) || null,
+        });
       }
     }
-    const extraRows = [...stoMap.values()].map(sm => ({sup: null, sto: sm, type:'extra'}));
 
-    // Step 4 — Cert & price check
+    // Step 3 — Match (only if reconciliation mode)
+    markStep(3);
+    let matched = [], missingRows = [], extraRows = [];
+    if(doReconcile) {
+      const stoMap = new Map(stoDedup.map(r => [r._skuNorm, r]));
+      for(const sr of supRows) {
+        const sm = stoMap.get(sr._refNorm);
+        if(sm) {
+          matched.push({sup: sr, sto: sm, type:'matched'});
+          stoMap.delete(sr._refNorm);
+        } else {
+          missingRows.push({sup: sr, sto: null, type:'missing'});
+        }
+      }
+      extraRows = [...stoMap.values()].map(sm => ({sup: null, sto: sm, type:'extra'}));
+    }
+
+    // Step 4 — Cert & price check (only if reconciliation mode)
     markStep(4);
     let certMismatches = 0, priceMismatches = 0;
-    for(const row of matched) {
-      const {sup, sto} = row;
-      const grown = String(sup.Grown||'').toUpperCase().trim();
-      if(grown === 'CVD' && sup._certNum && sto._certNumSto && sup._certNum !== sto._certNumSto) {
-        row._certMismatch = true;
-        certMismatches++;
-      }
-      if(sup._ppcSup !== null && sto._ppcSto !== null) {
-        if(Math.abs(sup._ppcSup - sto._ppcSto) > 0.5) {
-          row._priceMismatch = true;
-          priceMismatches++;
+    if(doReconcile) {
+      for(const row of matched) {
+        const {sup, sto} = row;
+        const grown = String(sup.Grown||'').toUpperCase().trim();
+        if(grown === 'CVD' && sup._certNum && sto._certNumSto && sup._certNum !== sto._certNumSto) {
+          row._certMismatch = true;
+          certMismatches++;
+        }
+        if(sup._ppcSup !== null && sto._ppcSto !== null) {
+          if(Math.abs(sup._ppcSup - sto._ppcSto) > 0.5) {
+            row._priceMismatch = true;
+            priceMismatches++;
+          }
         }
       }
     }
@@ -1121,32 +1134,43 @@ async function runReconciliation() {
     // Step 7 — Build Excel
     markStep(7);
     await new Promise(r => setTimeout(r, 50));
-    const wb = buildExcel(allRows, rows1ctDef, ssAll, ssDef,
+    const wb = buildExcel(
+      doReconcile ? allRows : [],
+      doReconcile ? rows1ctDef : [],
+      doReconcile ? ssAll : [],
+      doReconcile ? ssDef : [],
       {nMatch, nMissing, nExtra, nNeg, certMismatches, priceMismatches,
        supTotal: supRows.length, stoTotal: stoDedup.length,
        sup1ctDef, sto1ctDef, getCarat, getColor, getShape, getSupQty, getStoQty,
-       supRows, oldSupRows, supRowsAll, oldSupRowsAll});
+       supRows, oldSupRows, supRowsAll, oldSupRowsAll,
+       doReconcile});
 
     setProgress(100, steps.map((s,i) => ({...s, state:'done'})));
     xlsxResult = wb;
 
-    // render UI
-    renderStats(nMatch, nMissing, nExtra, nNeg, certMismatches, priceMismatches,
-                supRows.length, stoDedup.length, sup1ctDef, sto1ctDef);
-    renderTable('table-all', ssAll);
-    renderTable('table-def', ssDef);
+    // render UI — reconciliation section (only if store file uploaded)
+    const reconcileSection  = document.getElementById('reconcile-section');
+    const priceSection      = document.getElementById('price-section');
 
-    // render price analysis
-    const priceSection = document.getElementById('price-section');
+    if(doReconcile) {
+      reconcileSection.style.display = 'block';
+      renderStats(nMatch, nMissing, nExtra, nNeg, certMismatches, priceMismatches,
+                  supRows.length, stoDedup.length, sup1ctDef, sto1ctDef);
+      renderTable('table-all', ssAll);
+      renderTable('table-def', ssDef);
+    } else {
+      reconcileSection.style.display = 'none';
+    }
+
+    // render price analysis (always when supplier file present)
     priceSection.style.display = 'block';
-    // Update button labels to reflect current selection
     const prbHk = document.getElementById('prb-hk');
     if(prbHk) prbHk.textContent = '已选地区: ' + getSelectedLocsLabel();
     const prbAll = document.getElementById('prb-all');
     if(prbAll) prbAll.textContent = '全部地区 All Regions';
     renderPriceMatrix();
 
-    // show price change section only if old file uploaded
+    // show price change section only if old supplier file uploaded
     document.getElementById('price-change-label').style.display = oldSupFile ? 'block' : 'none';
     document.getElementById('price-change-wrap').style.display  = oldSupFile ? 'block' : 'none';
 
@@ -1159,7 +1183,7 @@ async function runReconciliation() {
   } finally {
     btn.disabled = false;
     spinner.classList.remove('visible');
-    runText.textContent = '▶ 生成对账报告 Generate Report';
+    runText.textContent = '▶ 生成报告 Generate Report';
   }
 }
 
@@ -1255,23 +1279,23 @@ function renderTable(id, ss) {
 function buildExcel(allRows, rows1ctDef, ssAll, ssDef, meta) {
   const {nMatch, nMissing, nExtra, nNeg, certMismatches, priceMismatches,
          supTotal, stoTotal, sup1ctDef, sto1ctDef, getCarat, getColor, getShape, getSupQty, getStoQty,
-         supRows, oldSupRows, supRowsAll, oldSupRowsAll} = meta;
+         supRows, oldSupRows, supRowsAll, oldSupRowsAll, doReconcile} = meta;
 
   const wb = XLSX.utils.book_new();
 
-  // ── Sheet 1: Shape Summary ──
-  const ss1 = buildShapeSheet(ssAll, ssDef, supTotal, stoTotal, sup1ctDef, sto1ctDef);
-  XLSX.utils.book_append_sheet(wb, ss1, '形状汇总 Shape Summary');
+  // ── Sheets 1-3: Reconciliation (only if store file was uploaded) ──
+  if(doReconcile !== false) {
+    const ss1 = buildShapeSheet(ssAll, ssDef, supTotal, stoTotal, sup1ctDef, sto1ctDef);
+    XLSX.utils.book_append_sheet(wb, ss1, '形状汇总 Shape Summary');
 
-  // ── Sheet 2: Full Detail ──
-  const detail = buildDetailSheet(allRows, getCarat, getColor, getShape, getSupQty, getStoQty,
-    nMatch, nMissing, nExtra, nNeg, certMismatches, priceMismatches);
-  XLSX.utils.book_append_sheet(wb, detail, '完整对账表 Full Detail');
+    const detail = buildDetailSheet(allRows, getCarat, getColor, getShape, getSupQty, getStoQty,
+      nMatch, nMissing, nExtra, nNeg, certMismatches, priceMismatches);
+    XLSX.utils.book_append_sheet(wb, detail, '完整对账表 Full Detail');
 
-  // ── Sheet 3: 1ct+ DEF ──
-  const detail1ct = buildDetailSheet(rows1ctDef, getCarat, getColor, getShape, getSupQty, getStoQty,
-    null, null, null, null, null, null, true);
-  XLSX.utils.book_append_sheet(wb, detail1ct, '1ct+ DEF明细');
+    const detail1ct = buildDetailSheet(rows1ctDef, getCarat, getColor, getShape, getSupQty, getStoQty,
+      null, null, null, null, null, null, true);
+    XLSX.utils.book_append_sheet(wb, detail1ct, '1ct+ DEF明细');
+  }
 
   // ── Sheet 4: DEF Price Analysis ──
   const priceNewRows = supRowsAll || supRows;
