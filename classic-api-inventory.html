@@ -451,7 +451,7 @@
     <h1>库存对账工具</h1>
     <p>Inventory Reconciliation · Doveggs</p>
   </div>
-  <span class="badge">v1.9.1</span>
+  <span class="badge">v1.9.2</span>
 </header>
 
 <main>
@@ -623,14 +623,14 @@
 
 </main>
 
-<footer>Doveggs Inventory Reconciliation Tool · v1.9.1 · 数据在本地处理，不上传服务器</footer>
+<footer>Doveggs Inventory Reconciliation Tool · v1.9.2 · 数据在本地处理，不上传服务器</footer>
 
 <script>
 
 // ════════════════════════════════════════════════════════════
 // PRICE ANALYSIS CONSTANTS
 // ════════════════════════════════════════════════════════════
-const WHITE_COLORS = new Set(['D','E','F','G','H','I','J','FG','EF','Q-R','S-T','U-V','Y-Z']);
+const WHITE_COLORS = new Set(['D','E','F','G','H','I','J','FG','EF']);
 const DEF_SET      = new Set(['D','E','F']);
 const CT_BANDS     = ['<1','1-2','2-3','3-4','4-5','5-6','6-7','7+'];
 // Locations now dynamic — see getSelectedLocs()
@@ -656,10 +656,12 @@ function isFancy(color) {
 // ════════════════════════════════════════════════════════════
 // CONSTANTS
 // ════════════════════════════════════════════════════════════
+// ⚠️ 已弃用（DEPRECATED）：形状不再作为匹配/过滤条件。常规形状清单见下方
+// REGULAR_SHAPES；此常量保留仅为兼容，请勿在新逻辑中使用。
 const TARGET_SHAPES = [
   'Asscher','Cushion','Emerald','Heart','Hexagon','Marquise','Moval',
   'Oval','Pear','Princess','Radiant','Round',
-  'K100 Princess','K100 Round','LONG STEP CUT OVAL','LONG STEP CUT PEAR',
+  'K100 Princess','LONG STEP CUT OVAL',
   'Step Cut Oval','Step Cut Pear','Step Cut Marquise',
   'Old Mine Oval','Old Mine Pear','Oval Rose Cut','Round Rose Cut'
 ];
@@ -667,16 +669,46 @@ const TARGET_SHAPES = [
 const EXCL_COLORS   = ['G','H','I','FG'];
 const DEF_COLORS    = ['D','E','F'];
 
-const SUP_SHAPE_MAP = {
-  'Oval-M':'Oval','Long Cushion':'Cushion',
-  'Elongated Cushion':'Cushion','Cushion (Mixed)':'Cushion',   // ← 修复形状不对称导致的假多余
-  'Oval (Rose)':'Oval Rose Cut','Round (Rose)':'Round Rose Cut'
+// ── 形状归一系统（Canonical Shape System）──────────────────────────
+// 设计原则：形状名【只用于展示与分组，绝不参与库存匹配】。匹配一律按货号
+// （SKU/Ref）。任何未知形状名自动归入「边石/其他」，不会污染常规形状行，
+// 也不会制造假 Missing/Extra；将来供应商改名同样自动兜底。
+//
+// 常规形状（每个单独成行；若出现在未匹配中即为异常，一眼可见）
+const REGULAR_SHAPES = [
+  'Round','Oval','Pear','Radiant','Emerald','Cushion','Marquise',
+  'Princess','Asscher','Heart','Hexagon','Moval',
+  'Step Cut Oval','Step Cut Pear','Step Cut Marquise',
+  'LONG STEP CUT OVAL','LONG STEP CUT PEAR','LONG STEP CUT MARQUISE',
+  'Dutch Marquise','Oval Rose Cut','Round Rose Cut',
+  'Old Mine Oval','Old Mine Pear','K100 Princess','K100 Round'
+];
+const REGULAR_SET = new Set(REGULAR_SHAPES);
+const SIDE_STONE_LABEL = '边石/其他 Side Stone';
+
+// 别名表（键统一小写）：把供应商 / 商店各种写法归一到同一标准形状
+const SHAPE_ALIAS = {
+  'oval-m':'Oval',
+  'elongated cushion':'Cushion','long cushion':'Cushion',
+  'oval (rose)':'Oval Rose Cut','round (rose)':'Round Rose Cut',
+  'oval step':'Step Cut Oval','oval modified step':'Step Cut Oval',
+  'pear step':'Step Cut Pear','pear modified step':'Step Cut Pear',
+  'marquise modified step':'Step Cut Marquise',
+  'dutch marquise':'Dutch Marquise',
 };
-const STO_SHAPE_MAP = {
-  'Oval Modified Step':'Step Cut Oval',
-  'Pear Modified Step':'Step Cut Pear',
-  'Marquise Modified Step':'Step Cut Marquise'
-};
+
+// 归一函数：大小写不敏感、去首尾空格；未知名原样返回（后续归入边石/其他）
+function canonShape(raw) {
+  const s = String(raw||'').trim();
+  if(!s) return '';
+  const low = s.toLowerCase();
+  if(SHAPE_ALIAS[low]) return SHAPE_ALIAS[low];
+  const hit = REGULAR_SHAPES.find(c => c.toLowerCase() === low);
+  return hit || s;
+}
+function isRegularShape(canon) { return REGULAR_SET.has(canon); }
+// 汇总分组键：常规形状用自身，其它一律折叠到「边石/其他」
+function groupShape(canon) { return REGULAR_SET.has(canon) ? canon : SIDE_STONE_LABEL; }
 
 const SKU_COL    = 'Metafield: custom.sku [single_line_text_field]';
 const REPORT_COL = 'Metafield: custom.report [single_line_text_field]';
@@ -884,14 +916,9 @@ function sheetToRows(wb, sheetName) {
 function normRef(s) { return String(s||'').replace(/-/g,'').toLowerCase().trim(); }
 function normSku(s)  { return String(s||'').replace(/-/g,'').toLowerCase().trim(); }
 
-function normSupShape(s) {
-  s = String(s||'').trim();
-  return SUP_SHAPE_MAP[s] || s;
-}
-function normStoShape(s) {
-  s = String(s||'').trim();
-  return STO_SHAPE_MAP[s] || s;
-}
+// 供应商 / 商店两端统一走 canonShape（单一数据源），形状名归一到标准形状
+function normSupShape(s) { return canonShape(s); }
+function normStoShape(s) { return canonShape(s); }
 
 // ────────────────────────────────────────────────────────────
 // Shopify 原生导出解析（与 Matrixify 流程口径对齐）
@@ -936,9 +963,8 @@ function parseShopifyNativeRows(wb) {
     return status !== 'draft' && status !== 'archived' && pub !== 'false';
   });
 
-  // 5) 按目标形状筛选
+  // 5) 形状仅作展示/分组，不再作为匹配过滤条件（保留归一函数供下游分组用）
   const shapeNorm = r => normStoShape(String(r[SHO_SHAPE_COL]||'').trim());
-  rows = rows.filter(r => TARGET_SHAPES.includes(shapeNorm(r)));
 
   // 6) 按 Variant SKU 去重 + 字段归一化（复制到 Matrixify 同名键）
   const seenSku = new Set();
@@ -1083,8 +1109,7 @@ async function runReconciliation() {
 
     // supRowsAll = full dataset for price analysis "All Regions" view
     // (for 已筛选 mode this is the full 已筛选 sheet; for raw mode it's color/status filtered but ALL locations)
-    const supRowsAll = supRowsRaw.map(r => ({...r, _shapeNorm: normSupShape(r.Shape||'')}))
-                                  .filter(r => TARGET_SHAPES.includes(r._shapeNorm));
+    const supRowsAll = supRowsRaw.map(r => ({...r, _shapeNorm: normSupShape(r.Shape||'')}));
 
     // supRows = location-filtered dataset for reconciliation
     let supRows = supRowsRaw.filter(r => {
@@ -1098,9 +1123,8 @@ async function runReconciliation() {
       return sel.size === 0 || sel.has(loc);
     });
 
-    // normalize shape and filter for reconciliation
+    // 形状仅作展示/分组，不参与匹配 —— 归一形状但不过滤
     supRows = supRows.map(r => ({...r, _shapeNorm: normSupShape(r.Shape||'')}));
-    supRows = supRows.filter(r => TARGET_SHAPES.includes(r._shapeNorm));
     supRows.forEach(r => {
       r._refNorm  = normRef(r['Ref.No.']||'');
       r._certNum  = extractCertNum(r.Certilink);
@@ -1119,7 +1143,6 @@ async function runReconciliation() {
       let stoRows = sheetToRows(stoWb, stoSheetName);
       stoRows = stoRows.filter(r => String(r.Status||'').toLowerCase().trim() !== 'draft');
       const stoShapeNorm = r => normStoShape(String(r[SHAPE_COL]||'').trim());
-      stoRows = stoRows.filter(r => TARGET_SHAPES.includes(stoShapeNorm(r)));
       const seenSku = new Set();
       for(const r of stoRows) {
         const sku = r[SKU_COL];
@@ -1187,6 +1210,12 @@ async function runReconciliation() {
     nMissing = missingRows.length;
     nExtra   = extraRows.length;
 
+    // 边石拆分：边石(非常规形状)是供应商经营、商店不引入的品类，不计入头部差异/缺失
+    const supSide  = supRows.filter(r => groupShape(r._shapeNorm) === SIDE_STONE_LABEL).length;
+    const supReg   = supRows.length - supSide;                       // 常规口径供应商总数
+    const nMissingSide = missingRows.filter(r => groupShape(r.sup._shapeNorm) === SIDE_STONE_LABEL).length;
+    const nMissingReg  = nMissing - nMissingSide;                    // 常规口径缺失
+
     // helper: get carat/color
     function getCarat(r) {
       if(r.sup) { const v=parseFloat(r.sup.Carat); if(!isNaN(v)) return v; }
@@ -1210,17 +1239,19 @@ async function runReconciliation() {
       return 0;
     }
 
-    // shape summary
+    // shape summary —— 常规形状逐行显示（含全 0 行，便于发现"常规形状却无库存"的异常）
+    // 非常规形状一律折叠到「边石/其他」聚合行。形状只用于分组，不参与匹配。
     function buildShapeSummary(rows) {
+      const order = [...REGULAR_SHAPES, SIDE_STONE_LABEL];
       const map = {};
-      for(const s of TARGET_SHAPES) map[s] = {sup:0, sto:0};
+      for(const s of order) map[s] = {sup:0, sto:0};
       for(const r of rows) {
-        const s = getShape(r);
-        if(!map[s]) continue;
-        map[s].sup += getSupQty(r);
-        map[s].sto += getStoQty(r);
+        const key = groupShape(getShape(r));
+        if(!map[key]) map[key] = {sup:0, sto:0};
+        map[key].sup += getSupQty(r);
+        map[key].sto += getStoQty(r);
       }
-      return TARGET_SHAPES.map(s => ({
+      return order.map(s => ({
         shape: s, sup: map[s].sup, sto: map[s].sto, diff: map[s].sup - map[s].sto
       }));
     }
@@ -1232,8 +1263,10 @@ async function runReconciliation() {
     });
     const ssDef = buildShapeSummary(rows1ctDef);
 
-    const sup1ctDef = rows1ctDef.reduce((a,r)=>a+getSupQty(r),0);
-    const sto1ctDef = rows1ctDef.reduce((a,r)=>a+getStoQty(r),0);
+    // 1ct+DEF 计数同样排除边石，与下方形状汇总合计口径一致
+    const rows1ctDefReg = rows1ctDef.filter(r => groupShape(getShape(r)) !== SIDE_STONE_LABEL);
+    const sup1ctDef = rows1ctDefReg.reduce((a,r)=>a+getSupQty(r),0);
+    const sto1ctDef = rows1ctDefReg.reduce((a,r)=>a+getStoQty(r),0);
 
     // Step 6 — Price analysis
     markStep(6);
@@ -1256,8 +1289,7 @@ async function runReconciliation() {
         if(hasStatus) rawOld = rawOld.filter(r => String(r.Status||'').trim() === 'Available');
       }
       // oldSupRowsAll = all locations (for price analysis full view)
-      oldSupRowsAll = rawOld.map(r => ({...r, _shapeNorm: normSupShape(r.Shape||'')}))
-                             .filter(r => TARGET_SHAPES.includes(r._shapeNorm));
+      oldSupRowsAll = rawOld.map(r => ({...r, _shapeNorm: normSupShape(r.Shape||'')}));
       // oldSupRows = selected locations only
       rawOld = rawOld.filter(r => {
         if(supType === 'raw') {
@@ -1269,7 +1301,6 @@ async function runReconciliation() {
         return sel.size === 0 || sel.has(l);
       });
       rawOld = rawOld.map(r => ({...r, _shapeNorm: normSupShape(r.Shape||'')}));
-      rawOld = rawOld.filter(r => TARGET_SHAPES.includes(r._shapeNorm));
       oldSupRows = rawOld;
     }
 
@@ -1285,6 +1316,7 @@ async function runReconciliation() {
       doReconcile ? ssDef : [],
       {nMatch, nMissing, nExtra, nNeg, certMismatches, priceMismatches,
        supTotal: supRows.length, stoTotal: stoDedup.length,
+       supReg, supSide, nMissingReg, nMissingSide,
        sup1ctDef, sto1ctDef, getCarat, getColor, getShape, getSupQty, getStoQty,
        supRows, oldSupRows, supRowsAll, oldSupRowsAll,
        doReconcile});
@@ -1298,8 +1330,8 @@ async function runReconciliation() {
 
     if(doReconcile) {
       reconcileSection.style.display = 'block';
-      renderStats(nMatch, nMissing, nExtra, nNeg, certMismatches, priceMismatches,
-                  supRows.length, stoDedup.length, sup1ctDef, sto1ctDef);
+      renderStats(nMatch, nMissingReg, nExtra, nNeg, certMismatches, priceMismatches,
+                  supReg, stoDedup.length, sup1ctDef, sto1ctDef, supSide);
       renderTable('table-all', ssAll);
       renderTable('table-def', ssDef);
     } else {
@@ -1334,10 +1366,11 @@ async function runReconciliation() {
 // ════════════════════════════════════════════════════════════
 // RENDER STATS
 // ════════════════════════════════════════════════════════════
-function renderStats(nMatch, nMissing, nExtra, nNeg, certM, priceM, supT, stoT, s1ct, st1ct) {
+function renderStats(nMatch, nMissing, nExtra, nNeg, certM, priceM, supT, stoT, s1ct, st1ct, supSide) {
+  supSide = supSide || 0;
   document.getElementById('stats-grid').innerHTML = `
     <div class="stat-card">
-      <div class="s-label">供应商总数 Supplier</div>
+      <div class="s-label">供应商总数 Supplier <span style="font-size:11px;opacity:.7">(常规，不含边石)</span></div>
       <div class="s-value c-accent">${supT.toLocaleString()}</div>
     </div>
     <div class="stat-card">
@@ -1349,14 +1382,18 @@ function renderStats(nMatch, nMissing, nExtra, nNeg, certM, priceM, supT, stoT, 
       <div class="s-value c-green">${nMatch.toLocaleString()}</div>
     </div>
     <div class="stat-card">
-      <div class="s-label">差值 Difference</div>
+      <div class="s-label">差值 Difference <span style="font-size:11px;opacity:.7">(常规口径)</span></div>
       <div class="s-value ${supT-stoT>0?'c-orange':supT-stoT<0?'c-yellow':'c-green'}">${(supT-stoT>0?'+':'')+(supT-stoT)}</div>
     </div>
   `;
   document.getElementById('stats-row2').innerHTML = `
     <div class="mini-stat">
-      <span class="ms-label">⚠️ 缺失 Missing (Supplier Only)</span>
+      <span class="ms-label">⚠️ 缺失 Missing (Supplier Only, 常规)</span>
       <span class="ms-val c-yellow">${nMissing}</span>
+    </div>
+    <div class="mini-stat">
+      <span class="ms-label">🪨 边石 Side Stone (不计入差异)</span>
+      <span class="ms-val c-accent">${supSide.toLocaleString()}</span>
     </div>
     <div class="mini-stat">
       <span class="ms-label">🔴 多余 Extra (Store Only)</span>
@@ -1385,24 +1422,33 @@ function renderStats(nMatch, nMissing, nExtra, nNeg, certM, priceM, supT, stoT, 
 // RENDER TABLE
 // ════════════════════════════════════════════════════════════
 function renderTable(id, ss) {
-  const totSup = ss.reduce((a,r)=>a+r.sup,0);
-  const totSto = ss.reduce((a,r)=>a+r.sto,0);
+  const isSide = r => r.shape === SIDE_STONE_LABEL;
+  // 合计只统计常规形状；边石(应过滤)不计入差异
+  const totSup = ss.filter(r=>!isSide(r)).reduce((a,r)=>a+r.sup,0);
+  const totSto = ss.filter(r=>!isSide(r)).reduce((a,r)=>a+r.sto,0);
   const totDif = totSup - totSto;
 
   const rows = ss.map(r => {
+    const side = isSide(r);
     const dc = r.diff>0?'diff-pos':r.diff<0?'diff-neg':'diff-zero';
     const sign = r.diff>0?'+':'';
-    return `<tr>
-      <td>${r.shape}</td>
+    const label = side
+      ? `${r.shape} <span style="font-size:11px;opacity:.7">· 应过滤·不计入差异</span>`
+      : r.shape;
+    const diffCell = side
+      ? `<td class="diff-zero" style="opacity:.6">(${sign}${r.diff})</td>`
+      : `<td class="${dc}">${sign}${r.diff}</td>`;
+    return `<tr${side?' style="opacity:.75"':''}>
+      <td>${label}</td>
       <td>${r.sup}</td>
       <td>${r.sto}</td>
-      <td class="${dc}">${sign}${r.diff}</td>
+      ${diffCell}
     </tr>`;
   }).join('');
 
   const totDc = totDif>0?'diff-pos':totDif<0?'diff-neg':'diff-zero';
   document.getElementById(id).innerHTML = `
-    <div class="table-header">📊 ${ss.filter(r=>r.sup>0||r.sto>0).length} / ${TARGET_SHAPES.length} 种形状有库存</div>
+    <div class="table-header">📊 ${ss.filter(r=>r.sup>0||r.sto>0).length} / ${ss.length} 种形状有库存</div>
     <table>
       <thead><tr><th>形状 Shape</th><th>供应商 Supplier</th><th>商店 Store</th><th>差值 Diff</th></tr></thead>
       <tbody>
@@ -1422,23 +1468,27 @@ function renderTable(id, ss) {
 // ════════════════════════════════════════════════════════════
 function buildExcel(allRows, rows1ctDef, ssAll, ssDef, meta) {
   const {nMatch, nMissing, nExtra, nNeg, certMismatches, priceMismatches,
-         supTotal, stoTotal, sup1ctDef, sto1ctDef, getCarat, getColor, getShape, getSupQty, getStoQty,
+         supTotal, stoTotal, supReg, supSide, nMissingReg, nMissingSide,
+         sup1ctDef, sto1ctDef, getCarat, getColor, getShape, getSupQty, getStoQty,
          supRows, oldSupRows, supRowsAll, oldSupRowsAll, doReconcile} = meta;
 
   const wb = XLSX.utils.book_new();
 
   // ── Sheets 1-3: Reconciliation (only if store file was uploaded) ──
   if(doReconcile !== false) {
-    const ss1 = buildShapeSheet(ssAll, ssDef, supTotal, stoTotal, sup1ctDef, sto1ctDef);
+    const ss1 = buildShapeSheet(ssAll, ssDef, supReg, stoTotal, sup1ctDef, sto1ctDef, supSide);
     XLSX.utils.book_append_sheet(wb, ss1, '形状汇总 Shape Summary');
 
     const detail = buildDetailSheet(allRows, getCarat, getColor, getShape, getSupQty, getStoQty,
-      nMatch, nMissing, nExtra, nNeg, certMismatches, priceMismatches);
+      nMatch, nMissing, nExtra, nNeg, certMismatches, priceMismatches, false, nMissingReg, nMissingSide);
     XLSX.utils.book_append_sheet(wb, detail, '完整对账表 Full Detail');
 
     const detail1ct = buildDetailSheet(rows1ctDef, getCarat, getColor, getShape, getSupQty, getStoQty,
       null, null, null, null, null, null, true);
     XLSX.utils.book_append_sheet(wb, detail1ct, '1ct+ DEF明细');
+
+    const shapeDiv = buildShapeDivergenceSheet(allRows);
+    XLSX.utils.book_append_sheet(wb, shapeDiv, '形状名称差异 Shape Divergence');
   }
 
   // ── Sheet 4: DEF Price Analysis ──
@@ -1453,34 +1503,32 @@ function buildExcel(allRows, rows1ctDef, ssAll, ssDef, meta) {
 
   // ── Sheet 6: Shape Mapping ──
   const mapData = [
-    ['供应商形状 Supplier Shape','商店形状 Store Shape','标准形状 Normalized Shape'],
-    ['Oval-M','Oval','Oval'],
-    ['Long Cushion','Cushion','Cushion'],
-    ['Step Cut Oval','Oval Modified Step','Step Cut Oval'],
-    ['Step Cut Pear','Pear Modified Step','Step Cut Pear'],
-    ['Step Cut Marquise','Marquise Modified Step','Step Cut Marquise'],
-    ['Old Mine Oval','Old Mine Oval','Old Mine Oval'],
-    ['Old Mine Pear','Old Mine Pear','Old Mine Pear'],
-    ['Oval (Rose)','Oval Rose Cut','Oval Rose Cut'],
-    ['Round (Rose)','Round Rose Cut','Round Rose Cut'],
-    ['Moval','Moval','Moval'],
-    ['Hexagon','Hexagon','Hexagon'],
-    ['K100 Princess','K100 Princess','K100 Princess'],
-    ['K100 Round','K100 Round','K100 Round'],
-    ['LONG STEP CUT OVAL','LONG STEP CUT OVAL','LONG STEP CUT OVAL'],
-    ['LONG STEP CUT PEAR','LONG STEP CUT PEAR','LONG STEP CUT PEAR'],
+    ['形状归一映射（形状仅用于展示/分组，不参与匹配；匹配只认货号）'],
+    [],
+    ['别名 原始名（两端通用，大小写不敏感）','→ 标准形状 Normalized'],
+    ['Oval-M','Oval'],
+    ['Elongated Cushion / Long Cushion','Cushion'],
+    ['Oval Step / Oval Modified Step','Step Cut Oval'],
+    ['Pear Step / Pear Modified Step','Step Cut Pear'],
+    ['Marquise Modified Step','Step Cut Marquise'],
+    ['Oval (Rose)','Oval Rose Cut'],
+    ['Round (Rose)','Round Rose Cut'],
+    ['DUTCH MARQUISE（仅大小写差异）','Dutch Marquise'],
+    [],
+    ['常规形状 Regular（逐行显示）', REGULAR_SHAPES.join('、')],
+    ['其它未列形状','自动归入「边石/其他 Side Stone」，不影响匹配'],
   ];
   const mapWs = XLSX.utils.aoa_to_sheet(mapData);
-  mapWs['!cols'] = [{wch:28},{wch:28},{wch:28}];
+  mapWs['!cols'] = [{wch:38},{wch:60}];
   XLSX.utils.book_append_sheet(wb, mapWs, '形状映射 Shape Mapping');
 
   // ── Sheet 7: Notes ──
   const notesData = [
     ['说明项','内容'],
     ['地区筛选 Location', getSelectedLocsLabel()],
-    ['匹配方式 Match Key','供应商 Ref.No. 与商店 SKU 均去掉所有连字符后转小写比对'],
-    ['形状归一化','供应商和商店两端形状名称统一映射为标准形状后比对（见"形状映射"Sheet）'],
-    ['目标形状 Target Shapes','12种主形状 + 11种特殊切工形状，共23种'],
+    ['匹配方式 Match Key','供应商 Ref.No. 与商店 SKU 均去掉所有连字符后转小写比对（形状不参与匹配）'],
+    ['形状角色','形状仅用于展示与分组，不参与匹配/过滤；两端形状名归一为标准形状后仅用于汇总，未知形状归入「边石/其他」'],
+    ['形状分组','常规形状逐行显示（便于发现"常规形状却无库存"的异常）；其余折叠为「边石/其他」'],
     ['1ct+ DEF筛选','Carat ≥ 1.00ct & Color ∈ D / E / F'],
     ['CVD证书比对','仅对 Grown=CVD 的匹配产品；从两边URL提取r=参数值比较；不一致时证书链接高亮'],
     ['价格比对','供应商$/ct. vs 商店price_per_carat；差值 > $0.50 时高亮'],
@@ -1541,7 +1589,7 @@ function buildPriceExcelSheet(newRows, oldRows, colorFilter, selectedNewRows) {
       const m = {};
       for(const r of rows) {
         const shape = normSupShape(String(r.Shape||'').trim());
-        if(!TARGET_SHAPES.includes(shape)) continue;
+        if(!isRegularShape(shape)) continue;
         const carat = parseFloat(r.Carat);
         const ppc   = parseFloat(r['$/ct.']);
         const band  = getCtBand(isNaN(carat)?null:carat);
@@ -1561,7 +1609,7 @@ function buildPriceExcelSheet(newRows, oldRows, colorFilter, selectedNewRows) {
     const totalNewAll = regRowsNew.length;  // denominator = all items in this region scope
 
     // Shapes and bands with data
-    const shapes = TARGET_SHAPES.filter(s => newM[s] && Object.keys(newM[s]).length > 0);
+    const shapes = REGULAR_SHAPES.filter(s => newM[s] && Object.keys(newM[s]).length > 0);
     const bands  = CT_BANDS.filter(b => shapes.some(s => newM[s] && newM[s][b]));
 
     aoa.push([`📍 ${regLabel}`]);
@@ -1629,7 +1677,7 @@ function buildPriceExcelSheet(newRows, oldRows, colorFilter, selectedNewRows) {
         const byShape = {};
         for(const r of lowAll) {
           const s = normSupShape(String(r.Shape||'').trim());
-          if(!TARGET_SHAPES.includes(s)) continue;
+          if(!isRegularShape(s)) continue;
           byShape[s] = (byShape[s]||0) + 1;
         }
         const topShapes = Object.entries(byShape).sort((a,b)=>b[1]-a[1]).slice(0,5);
@@ -1667,28 +1715,60 @@ function buildPriceExcelSheet(newRows, oldRows, colorFilter, selectedNewRows) {
   return ws;
 }
 
-function buildShapeSheet(ssAll, ssDef, supTotal, stoTotal, sup1ct, sto1ct) {
+// 形状名称差异清单：匹配成功但两端原始形状名不同的货（数据质量提示，非库存差异）
+function buildShapeDivergenceSheet(allRows) {
+  const body = [];
+  let n = 0;
+  for(const r of allRows) {
+    if(r.type !== 'matched' || !r.sup || !r.sto) continue;
+    const a = String(r.sup.Shape||'').trim();
+    const b = String(r.sto[SHAPE_COL]||'').trim();
+    if(a === b) continue;
+    n++;
+    body.push([
+      String(r.sup['Ref.No.']||''), a, b, canonShape(a),
+      (r.sup.Carat ?? ''), String(r.sup.Color||'')
+    ]);
+  }
+  const aoa = [
+    ['形状名称差异清单 — 匹配成功但供应商/商店形状名不同（非库存差异，仅命名口径提示）'],
+    [`共 ${n} 颗；这些货货号已匹配、数量差为 0，只是两端形状名写法不同`],
+    [],
+    ['供应商货号 Ref.No.','供应商形状 Supplier Shape','商店形状 Store Shape','标准形状 Normalized','克拉 Carat','颜色 Color'],
+    ...body
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{wch:22},{wch:22},{wch:24},{wch:20},{wch:8},{wch:8}];
+  return ws;
+}
+
+function buildShapeSheet(ssAll, ssDef, supTotal, stoTotal, sup1ct, sto1ct, supSide) {
+  supSide = supSide || 0;
+  const isSide = r => r.shape === SIDE_STONE_LABEL;
   const aoa = [];
   aoa.push(['库存对账报告 — 形状汇总 / Shape Summary']);
-  aoa.push([`供应商 Supplier: ${supTotal}件  |  商店 Store: ${stoTotal}件  |  日期: ${new Date().toISOString().slice(0,10)}`]);
+  aoa.push([`供应商(常规，不含边石) Supplier: ${supTotal}件  |  商店 Store: ${stoTotal}件  |  边石(不计入差异) Side Stone: ${supSide}件  |  日期: ${new Date().toISOString().slice(0,10)}`]);
   aoa.push([]);
   aoa.push(['形状 Shape','供应商数量 Supplier Qty','商店数量 Store Qty','数量差 Difference']);
   for(const r of ssAll) {
-    aoa.push([r.shape, r.sup, r.sto, r.sup-r.sto]);
+    const label = isSide(r) ? `${r.shape} (应过滤·不计入差异)` : r.shape;
+    aoa.push([label, r.sup, r.sto, r.sup-r.sto]);
   }
-  const totS = ssAll.reduce((a,r)=>a+r.sup,0);
-  const totSt= ssAll.reduce((a,r)=>a+r.sto,0);
-  aoa.push(['合计 Total', totS, totSt, totS-totSt]);
+  // 合计只统计常规形状，边石不计入
+  const totS = ssAll.filter(r=>!isSide(r)).reduce((a,r)=>a+r.sup,0);
+  const totSt= ssAll.filter(r=>!isSide(r)).reduce((a,r)=>a+r.sto,0);
+  aoa.push(['合计 Total (常规)', totS, totSt, totS-totSt]);
   aoa.push([]);
   aoa.push([`1ct以上 DEF色汇总  |  供应商 ${sup1ct}件  |  商店 ${sto1ct}件`]);
   aoa.push([]);
   aoa.push(['形状 Shape','供应商数量 Supplier Qty','商店数量 Store Qty','数量差 Difference']);
   for(const r of ssDef) {
-    aoa.push([r.shape, r.sup, r.sto, r.sup-r.sto]);
+    const label = isSide(r) ? `${r.shape} (应过滤·不计入差异)` : r.shape;
+    aoa.push([label, r.sup, r.sto, r.sup-r.sto]);
   }
-  const tot1S = ssDef.reduce((a,r)=>a+r.sup,0);
-  const tot1St= ssDef.reduce((a,r)=>a+r.sto,0);
-  aoa.push(['合计 Total', tot1S, tot1St, tot1S-tot1St]);
+  const tot1S = ssDef.filter(r=>!isSide(r)).reduce((a,r)=>a+r.sup,0);
+  const tot1St= ssDef.filter(r=>!isSide(r)).reduce((a,r)=>a+r.sto,0);
+  aoa.push(['合计 Total (常规)', tot1S, tot1St, tot1S-tot1St]);
 
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols'] = [{wch:26},{wch:22},{wch:20},{wch:18}];
@@ -1696,10 +1776,10 @@ function buildShapeSheet(ssAll, ssDef, supTotal, stoTotal, sup1ct, sto1ct) {
 }
 
 function buildDetailSheet(rows, getCarat, getColor, getShape, getSupQty, getStoQty,
-  nMatch, nMissing, nExtra, nNeg, certM, priceM, is1ct=false) {
+  nMatch, nMissing, nExtra, nNeg, certM, priceM, is1ct=false, nMissingReg, nMissingSide) {
   const headers = [
     '供应商货号 Supplier Ref.No.','供应商SKU(无连字符) Supplier SKU',
-    '克拉数 Carat','颜色 Color','供应商形状 Supplier Shape','标准形状 Normalized Shape',
+    '克拉数 Carat','颜色 Color','供应商形状 Supplier Shape','商店形状 Store Shape','标准形状 Normalized Shape',
     '供应商地区 Supplier Location','供应商证书号 Supplier Certi.No.',
     '供应商证书链接 Supplier Certilink','供应商$/ct. Supplier Price/ct',
     '商店SKU Store SKU','商店报告号 Store Report No.',
@@ -1727,7 +1807,10 @@ function buildDetailSheet(rows, getCarat, getColor, getShape, getSupQty, getStoQ
 
   const aoa = [];
   if(!is1ct && nMatch!==null) {
-    aoa.push([`✅ 匹配: ${nMatch}  |  ⚠️ 缺失: ${nMissing}  |  🔴 多余: ${nExtra}  |  CVD证书不一致: ${certM}  |  价格不一致: ${priceM}`]);
+    const missTxt = (nMissingReg!==undefined && nMissingSide!==undefined)
+      ? `${nMissing} (常规 ${nMissingReg} + 边石 ${nMissingSide}，边石不计入差异)`
+      : `${nMissing}`;
+    aoa.push([`✅ 匹配: ${nMatch}  |  ⚠️ 缺失: ${missTxt}  |  🔴 多余: ${nExtra}  |  CVD证书不一致: ${certM}  |  价格不一致: ${priceM}`]);
   }
   aoa.push(headers);
 
@@ -1760,6 +1843,7 @@ function buildDetailSheet(rows, getCarat, getColor, getShape, getSupQty, getStoQ
       getCarat(r) !== null ? getCarat(r) : '',
       getColor(r),
       sup ? String(sup.Shape||'') : '',
+      sto ? String(sto[SHAPE_COL]||'') : '',
       getShape(r),
       sup ? String(sup.Location||'') : '',
       sup ? safeCerti(sup['Certi.No.']) : '',
@@ -1775,7 +1859,7 @@ function buildDetailSheet(rows, getCarat, getColor, getShape, getSupQty, getStoQ
   }
 
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [22,22,8,8,18,20,14,20,40,14,18,18,40,14,14,14,12,12,12,30].map(w=>({wch:w}));
+  ws['!cols'] = [22,22,8,8,18,18,20,14,20,40,14,18,18,40,14,14,14,12,12,12,30].map(w=>({wch:w}));
   return ws;
 }
 
@@ -1808,7 +1892,7 @@ function buildPriceMatrix(rows, colorFilter, allRows) {
   let grandTotal = 0;
   for(const r of baseRows) {
     const shape = normSupShape(String(r.Shape||'').trim());
-    if(!TARGET_SHAPES.includes(shape)) continue;
+    if(!isRegularShape(shape)) continue;
     const carat = parseFloat(r.Carat);
     const band  = getCtBand(isNaN(carat)?null:carat);
     if(!band) continue;
@@ -1820,7 +1904,7 @@ function buildPriceMatrix(rows, colorFilter, allRows) {
 
   for(const r of filtered) {
     const shape = normSupShape(String(r.Shape||'').trim());
-    if(!TARGET_SHAPES.includes(shape)) continue;
+    if(!isRegularShape(shape)) continue;
     const carat = parseFloat(r.Carat);
     const ppc   = parseFloat(r['$/ct.']);
     const band  = getCtBand(isNaN(carat)?null:carat);
@@ -1877,7 +1961,7 @@ function renderPriceMatrix() {
   const grandTotal = data.new.grandTotal;
 
   // Collect shapes and bands that have data
-  const shapesWithData = TARGET_SHAPES.filter(s => newM[s] && Object.keys(newM[s]).length > 0);
+  const shapesWithData = REGULAR_SHAPES.filter(s => newM[s] && Object.keys(newM[s]).length > 0);
   const bandsWithData  = CT_BANDS.filter(b => shapesWithData.some(s => newM[s] && newM[s][b]));
 
   if(shapesWithData.length === 0) {
