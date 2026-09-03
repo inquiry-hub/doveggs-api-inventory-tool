@@ -124,6 +124,8 @@ td.name-cell a:hover{color:var(--gold2)}
 .dedup-badge{display:inline-block;padding:.1rem .38rem;border-radius:3px;background:#1f1a0d;color:var(--amber);border:1px solid #3a2e10;font-size:.62rem;margin-left:.4rem;vertical-align:middle;letter-spacing:.03em;font-family:'Arial',monospace}
 .indb-tag{display:inline-block;padding:.16rem .45rem;border-radius:3px;font-family:'Arial',monospace;font-size:.65rem;background:#0d1a24;color:var(--blue);border:1px solid #1e3a50;white-space:nowrap}
 .new-tag{display:inline-block;padding:.16rem .45rem;border-radius:3px;font-family:'Arial',monospace;font-size:.65rem;background:#0d1f14;color:var(--green);border:1px solid #1e4030;white-space:nowrap}
+.seen-tag{display:inline-block;padding:.16rem .45rem;border-radius:3px;font-family:'Arial',monospace;font-size:.62rem;background:#1f1a0d;color:var(--amber);border:1px solid #3a2e10;white-space:nowrap}
+.sheet-tag{display:inline-block;padding:.16rem .45rem;border-radius:3px;font-family:'Arial',monospace;font-size:.62rem;background:#160d24;color:var(--purple);border:1px solid #2e1e50;white-space:nowrap}
 
 /* BATCH ACTION BAR */
 .batch-bar{display:flex;align-items:center;gap:.9rem;padding:.65rem 1.1rem;border-bottom:1px solid var(--bd);background:#12100e;flex-wrap:wrap}
@@ -160,7 +162,7 @@ td.name-cell a:hover{color:var(--gold2)}
 <body>
 <header>
   <h1>KOL Scout</h1>
-  <span>DovEggs · v3.0 · Influencer Research Tool</span>
+  <span>DovEggs · v3.5 · Influencer Research Tool</span>
 </header>
 <div class="container">
 
@@ -308,6 +310,24 @@ td.name-cell a:hover{color:var(--gold2)}
   </p>
 </div>
 
+<div class="panel" style="margin-top:1.2rem">
+  <div class="panel-title">建联表（Google Sheet）对接 <span style="font-size:.68rem;color:var(--tx3);font-weight:400">— 跨设备去重 + 自动写回「达人收集池」</span></div>
+  <div class="g2">
+    <div class="field"><label>Web App URL（部署后粘贴，自动保存）</label><input id="sheetUrl" placeholder="https://script.google.com/macros/s/..../exec" oninput="saveSheetCfg()"></div>
+    <div class="field"><label>口令 Token（与脚本里的 TOKEN 一致）</label><input id="sheetToken" placeholder="脚本里设置的 TOKEN" oninput="saveSheetCfg()"></div>
+  </div>
+  <div style="display:flex;gap:.5rem;margin-top:.6rem;align-items:center;flex-wrap:wrap">
+    <button class="btn btn-ghost" onclick="testSheet()">测试连接</button>
+    <button class="btn btn-ghost" onclick="convertSheetHandles()">扫描并转换历史链接</button>
+    <span id="sheetCfgStatus" style="font-size:.72rem;color:var(--tx3)"></span>
+  </div>
+  <div id="convStatus" style="font-size:.72rem;color:var(--tx3);margin-top:.5rem;line-height:1.7;font-family:'Arial',monospace;display:none"></div>
+  <p style="font-size:.72rem;color:var(--tx3);margin-top:.6rem;font-family:'Arial',monospace;line-height:1.6">
+    配置后：每次搜索会先比对建联表，已在表内的频道标注 <span class="sheet-tag">📇 已在建联表</span>；点「加入」时自动写回该表。留空则仅用浏览器本地去重。部署步骤见 <strong>Google表格对接_部署步骤.md</strong>。<br>
+    <span style="color:var(--amber)">「扫描并转换历史链接」</span>：把表里 <code>@handle</code>／<code>/user/xxx</code> 形式的账号链接批量转成 <code>/channel/UCxxxx</code>（去重更准）。需已部署<strong>新版</strong> Apps Script，且建议先备份表格。每转 1 条约耗 1 次 API 配额，<code>/c/xxx</code> 与失效频道无法转换会列入清单。
+  </p>
+</div>
+
 </div><!-- /tab-discover -->
 
 
@@ -431,11 +451,13 @@ td.name-cell a:hover{color:var(--gold2)}
 <div id="tab-search" class="tab-panel">
 
 <div class="note-box">
-  <strong>关键词搜索：</strong>输入关键词（如 <em>jewelry haul</em>、<em>fashion review</em>），每次最多返回 50 个频道并自动拉取完整数据<br>
+  <strong>关键词搜索：</strong>关键词框支持<strong>多行（一行一个词）</strong>，一次批量搜索多个词、自动跨词合并去重并自动拉取完整数据<br>
+  <strong>两种模式：</strong><strong>深挖</strong>=对同一个词自动翻页（最多设 10 页 / 约 500 条上限），边翻边跳过已搜过·已入库·已在建联表的，只挖新频道，适合「找到金矿词一次挖干净」；填「目标新频道数」凑够即停。<strong>增量</strong>=只搜最近 N 天新发布的视频，同一批词可天天搜、天天出新，不卡在旧结果上<br>
   <strong>筛选条件：</strong>先按粉丝量/国家粗筛（快速），再拉取均播放/互动率细筛，节省 API 配额<br>
-  <strong>去重：</strong>已在达人库中的频道自动标记「已在库」，加入时自动跳过重复
+  <strong>跨搜索去重：</strong>搜过的频道会被记住，结果里标注 <span class="new-tag">🆕 全新</span> / <span class="seen-tag">👀 X月X日『词』搜过</span> / <span class="indb-tag">✅ 已在库</span> / <span class="sheet-tag">📇 已在建联表</span>；勾选「只看全新频道」可一键隐藏搜过、已在库和已在建联表的<br>
+  <strong>建联表去重（需配置）：</strong>在【达人搜集】Tab 底部填好 Google Sheet 的 Web App URL 后，搜索会自动比对长期建联表「达人收集池」，加入时自动写回，换电脑/清缓存也不重复
   <div class="quota-info" style="margin-top:.5rem;padding-top:.5rem;border-top:1px solid var(--bd)">
-    配额参考：每次搜索约消耗 160 单位 · 每日 10,000 单位配额可支持约 <strong>62 次完整搜索（≈3,100 个频道）</strong>
+    配额参考：<strong>每翻一页 = 100 单位</strong>（search，与返回条数无关）+ 新频道数 ×约3（详情/视频）· 翻页越深、词越多消耗越大。开跑前若预估超 2000 单位会先弹确认；跑中配额满会自动停并保留已有结果。每日额度 10,000
   </div>
 </div>
 
@@ -443,13 +465,26 @@ td.name-cell a:hover{color:var(--gold2)}
   <div class="panel-title">搜索条件</div>
   <div class="g2" style="margin-bottom:.8rem">
     <div class="field">
-      <label>关键词（必填）</label>
-      <input id="bsKeyword" placeholder="jewelry haul / fashion review / lifestyle vlog">
+      <label>关键词（必填，一行一个词，可批量）</label>
+      <textarea id="bsKeyword" style="min-height:72px;font-size:.74rem" placeholder="jewelry haul&#10;fashion review&#10;lifestyle vlog"></textarea>
     </div>
     <div class="field">
       <label>国家代码（可选，留空不限）</label>
       <input id="bsCountry" placeholder="US / GB / AU / CA（频道注册国，区分大小写无关）">
+      <p style="font-size:.66rem;color:var(--amber);margin-top:.3rem;line-height:1.5">⚠️ YouTube 国家字段很多频道没填，填了会把「没填国家」的频道全部误杀（含实际是该国的），建议留空</p>
     </div>
+  </div>
+  <div class="g4" style="margin-bottom:.8rem">
+    <div class="field">
+      <label>搜索模式</label>
+      <select id="bsMode" onchange="onBsModeChange()">
+        <option value="deep">深挖（翻到底/翻够，专找新频道）</option>
+        <option value="incremental">增量（只搜最近新发布，可天天搜）</option>
+      </select>
+    </div>
+    <div class="field"><label>目标新频道数（留空=翻到底）</label><input type="number" id="bsDeepTarget" placeholder="如 50，留空翻到配额满/到底"></div>
+    <div class="field"><label>每词最大页数（1-10）</label><input type="number" id="bsDeepPages" placeholder="5" min="1" max="10"></div>
+    <div class="field" id="bsIncDaysWrap" style="display:none"><label>最近 N 天新发布</label><input type="number" id="bsIncDays" placeholder="7" min="1"></div>
   </div>
   <div class="g4" style="margin-bottom:.8rem">
     <div class="field"><label>最小粉丝量</label><input type="number" id="bsMinSub" placeholder="10000"></div>
@@ -467,7 +502,7 @@ td.name-cell a:hover{color:var(--gold2)}
   </div>
   <div class="action-row">
     <button class="btn btn-primary" id="bsBtn" onclick="batchSearch()">
-      <span id="bsBtnText">开始搜索（最多50个频道）</span>
+      <span id="bsBtnText">开始搜索</span>
     </button>
     <button class="btn btn-ghost" onclick="resetSearch()">重置结果</button>
   </div>
@@ -485,6 +520,9 @@ td.name-cell a:hover{color:var(--gold2)}
     <div class="table-header">
       <div class="table-header-title">搜索结果</div>
       <div class="table-actions" style="gap:.5rem;align-items:center">
+        <label class="batch-bar-label" style="font-size:.72rem;color:var(--tx2)">
+          <input type="checkbox" id="bsOnlyNew" onchange="renderSearchResults()"> 只看全新频道
+        </label>
         <label class="batch-bar-label" style="font-size:.72rem;color:var(--tx2)">
           <input type="checkbox" id="bsSelectAll" onchange="toggleAllSearch(this)"> 全选新频道
         </label>
@@ -505,6 +543,10 @@ td.name-cell a:hover{color:var(--gold2)}
 let creators = JSON.parse(localStorage.getItem('de_creators') || '[]');
 let posts     = JSON.parse(localStorage.getItem('de_posts')    || '[]');
 let links     = JSON.parse(localStorage.getItem('de_links')    || '[]');
+// 搜索足迹：记录所有搜索结果中出现过的频道，实现跨搜索去重
+// 结构 { channelId: { keyword: '首次搜到的关键词', date: 'YYYY-MM-DD' } }
+let seen = JSON.parse(localStorage.getItem('de_seen') || '{}');
+function saveSeen(){ localStorage.setItem('de_seen', JSON.stringify(seen)); }
 let searchResults = [];
 
 // ── API KEY ──
@@ -512,6 +554,160 @@ const keyInput = document.getElementById('ytKey');
 let YT_KEY = localStorage.getItem('de_ytkey') || '';
 if (keyInput && YT_KEY) keyInput.value = YT_KEY;
 function saveKey(){ YT_KEY = keyInput.value.trim(); localStorage.setItem('de_ytkey', YT_KEY); }
+
+// ── GOOGLE SHEET 建联表对接（跨设备去重 + 自动写回「达人收集池」）──
+let SHEET_URL   = localStorage.getItem('de_sheet_url')   || '';
+let SHEET_TOKEN = localStorage.getItem('de_sheet_token') || '';
+{
+  const su = document.getElementById('sheetUrl');   if(su && SHEET_URL)   su.value = SHEET_URL;
+  const st = document.getElementById('sheetToken'); if(st && SHEET_TOKEN) st.value = SHEET_TOKEN;
+}
+function saveSheetCfg(){
+  SHEET_URL   = (document.getElementById('sheetUrl').value||'').trim();
+  SHEET_TOKEN = (document.getElementById('sheetToken').value||'').trim();
+  localStorage.setItem('de_sheet_url', SHEET_URL);
+  localStorage.setItem('de_sheet_token', SHEET_TOKEN);
+}
+// 本轮内存去重集合：能提取到 UCxxxx 的进 channelId 集合，否则退化到标准化 URL 集合
+let sheetChannelIds = new Set();
+let sheetUrls       = new Set();
+function normChanId(url){ const m=(url||'').match(/\/channel\/(UC[\w-]{20,})/); return m?m[1]:''; }
+function normUrl(url){ return (url||'').trim().toLowerCase().replace(/\/+$/,''); }
+function inSheetPool(cid, url){
+  if(cid && sheetChannelIds.has(cid)) return true;
+  const u = normUrl(url);
+  return !!(u && sheetUrls.has(u));
+}
+async function loadSheetPool(){
+  if(!SHEET_URL) return false;
+  const r = await fetch(SHEET_URL, {method:'GET'});
+  const d = await r.json();
+  if(!d.ok) throw new Error(d.error||'读取建联表失败');
+  sheetChannelIds = new Set();
+  sheetUrls = new Set();
+  (d.urls||[]).forEach(u=>{
+    const cid = normChanId(u); if(cid) sheetChannelIds.add(cid);
+    const nu = normUrl(u);     if(nu) sheetUrls.add(nu);
+  });
+  return true;
+}
+async function testSheet(){
+  const set=(t,c)=>{ const e=document.getElementById('sheetCfgStatus'); if(e){ e.textContent=t; e.style.color=c; } };
+  if(!SHEET_URL){ set('请先填 Web App URL','var(--red)'); return; }
+  set('测试中...','var(--tx3)');
+  try{ await loadSheetPool(); set(`✓ 连接成功，建联表已有 ${sheetUrls.size} 条记录`,'var(--green)'); }
+  catch(e){ set('连接失败：'+e.message,'var(--red)'); }
+}
+// 搜索结果 → 建联表 23 列的字段映射（其余列留空，由脚本补齐）
+function toSheetRow(r){
+  return {
+    email: r.email||'', name: r.name||'', url: r.chanUrl||'', platform:'YouTube',
+    country: r.country||'', followers: r.subs||0, avgViews: r.avgViews||0,
+    er: (r.er!=null ? +(+r.er).toFixed(2) : ''), rating: calcRating(r.er),
+    date: new Date().toISOString().split('T')[0]
+  };
+}
+async function postToSheet(rows){
+  if(!SHEET_URL || !rows.length) return {ok:false};
+  // text/plain + 无自定义头：规避 Apps Script 不支持的 CORS 预检
+  const r = await fetch(SHEET_URL, {
+    method:'POST',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body: JSON.stringify({ token: SHEET_TOKEN, rows: rows })
+  });
+  return await r.json();
+}
+// 把已加入的达人写回建联表；成功后补进本轮去重集合，失败只提示不阻塞本地加入
+async function writeBack(rows){
+  if(!SHEET_URL || !rows.length) return;
+  try{
+    const res = await postToSheet(rows.map(toSheetRow));
+    if(res && res.ok){
+      rows.forEach(r=>{ const cid=r.cid; if(cid) sheetChannelIds.add(cid); const u=normUrl(r.chanUrl); if(u) sheetUrls.add(u); });
+      showToast('已写回建联表 '+(res.added||rows.length)+' 条');
+    } else { showToast('写回建联表失败：'+((res&&res.error)||'未知错误')); }
+  }catch(e){ showToast('写回建联表失败：'+e.message); }
+}
+// ── 批量把历史链接（@handle / /user/xxx）转成 /channel/UCxxxx ──
+// 读表带行号 → 逐条用 channels.list 解析出 channelId → 按行号回写第 4 列
+async function convertSheetHandles(){
+  const box = document.getElementById('convStatus');
+  const set = (html,c)=>{ if(box){ box.style.display=''; box.innerHTML=html; if(c) box.style.color=c; } };
+  if(!SHEET_URL || !SHEET_TOKEN){ set('请先填 Web App URL 和 口令 Token','var(--red)'); return; }
+  if(!YT_KEY){ set('请先填 API Key（解析 channelId 需要）','var(--red)'); return; }
+  set('读取建联表中...','var(--tx3)');
+  let list;
+  try{
+    const r = await fetch(SHEET_URL + (SHEET_URL.includes('?')?'&':'?') + 'mode=rows');
+    const d = await r.json();
+    if(!d.ok) throw new Error(d.error||'读取失败');
+    list = d.rows || [];
+  }catch(e){ set('读取建联表失败：'+e.message,'var(--red)'); return; }
+
+  // 只处理非 /channel/ 形式，且能识别 @handle 或 /user/xxx 的行
+  const jobs = [];         // {row, handle} 或 {row, username}
+  const failCList = [];    // /c/xxx 或无法识别，列入清单
+  list.forEach(item=>{
+    const url = (item.url||'').trim();
+    if(!url) return;
+    if(normChanId(url)) return;                 // 已是 /channel/UCxxxx，跳过
+    let m;
+    if(m = url.match(/youtube\.com\/@([\w.\-]+)/i))          jobs.push({row:item.row, url, handle:'@'+m[1]});
+    else if(m = url.match(/youtube\.com\/user\/([\w.\-]+)/i)) jobs.push({row:item.row, url, username:m[1]});
+    else if(/youtube\.com\/c\//i.test(url))                  failCList.push({row:item.row, url, why:'/c/ 自定义链接无可靠 API 反查'});
+    else                                                     failCList.push({row:item.row, url, why:'链接格式无法识别'});
+  });
+
+  if(!jobs.length){
+    set(`扫描完成：没有需要转换的链接（共 ${list.length} 行）。` + (failCList.length?`<br>其中 ${failCList.length} 条无法自动转换。`:''), 'var(--green)');
+    return;
+  }
+
+  const updates = [];   // {row, url}
+  const failResolve = [];
+  for(let i=0;i<jobs.length;i++){
+    const j = jobs[i];
+    set(`解析中... ${i+1}/${jobs.length}（成功 ${updates.length}）`,'var(--tx3)');
+    try{
+      const q = j.handle ? ('forHandle='+encodeURIComponent(j.handle))
+                         : ('forUsername='+encodeURIComponent(j.username));
+      const rr = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=id&${q}&key=${YT_KEY}`);
+      const dd = await rr.json();
+      if(isQuotaError(dd)){ set(`⚠️ 已解析 ${updates.length} 条，YouTube 配额用尽，先写回已解析的部分。`,'var(--amber)'); break; }
+      const cid = dd.items && dd.items[0] && dd.items[0].id;
+      if(cid) updates.push({row:j.row, url:`https://www.youtube.com/channel/${cid}`});
+      else    failResolve.push({row:j.row, url:j.url, why:'API 未返回频道（可能已改名/删号）'});
+    }catch(e){ failResolve.push({row:j.row, url:j.url, why:'请求出错：'+e.message}); }
+  }
+
+  // 回写：按行号更新第 4 列
+  let added = 0;
+  if(updates.length){
+    set(`写回建联表中...（${updates.length} 条）`,'var(--tx3)');
+    try{
+      const rr = await fetch(SHEET_URL, {
+        method:'POST',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify({ token: SHEET_TOKEN, action:'updateUrls', updates: updates })
+      });
+      const dd = await rr.json();
+      if(!dd.ok) throw new Error(dd.error||'写回失败');
+      added = dd.updated || updates.length;
+    }catch(e){ set('写回失败：'+e.message+'（已解析但未写回）','var(--red)'); return; }
+  }
+
+  const fails = failCList.concat(failResolve);
+  let html = `<span style="color:var(--green)">✓ 转换完成：成功 ${added} 条</span>`;
+  if(fails.length){
+    html += `　无法转换 ${fails.length} 条：<br>` +
+      fails.slice(0,50).map(f=>`　· 第 ${f.row} 行：${f.url}（${f.why}）`).join('<br>');
+    if(fails.length>50) html += `<br>　…… 其余 ${fails.length-50} 条略`;
+    html += `<br><span style="color:var(--tx3)">这些需要手动到表格补 /channel/ 链接（或忽略）。</span>`;
+  }
+  set(html, '');
+  // 刷新本轮内存去重集合，让转换后立即生效
+  try{ await loadSheetPool(); }catch(e){}
+}
 async function testKey(){
   if(!YT_KEY){ setStatus('discoverStatus','请先填入 API Key','error'); return; }
   setStatus('discoverStatus','测试中...','info');
@@ -779,6 +975,7 @@ function renderTable(){
       </label>
       <span class="sel-count" id="selCount">已选 0 条</span>
       <button class="btn btn-blue" onclick="copySelected()" style="padding:.38rem .9rem;font-size:.72rem">复制选中行（粘贴至 Excel）</button>
+      <button class="btn btn-danger" onclick="deleteSelected()" style="padding:.38rem .9rem;font-size:.72rem">删除选中</button>
       <span style="font-family:monospace;font-size:.68rem;color:var(--tx3);margin-left:auto">共 ${creators.length} 条${getDupUrlSet().size>0?' · ⚠️ 含重复':''}
       </span>
     </div>
@@ -813,6 +1010,16 @@ function toggleAllCreators(cb){
   updateSelCount();
 }
 
+function deleteSelected(){
+  const checked = [...document.querySelectorAll('.row-chk:checked')];
+  if(!checked.length){ showToast('请先勾选要删除的行'); return; }
+  const ids = new Set(checked.map(el=>+el.id.replace('chk-','')));
+  if(!confirm(`确认删除选中的 ${ids.size} 个达人？此操作不可撤销（仅删本地库，不影响已写回的建联表）`)) return;
+  creators = creators.filter(c=>!ids.has(c.id));
+  save(); renderTable(); updateStats();
+  showToast('已删除 '+ids.size+' 个达人');
+}
+
 function copySelected(){
   const checked = [...document.querySelectorAll('.row-chk:checked')];
   if(!checked.length){ showToast('请先勾选要复制的行'); return; }
@@ -824,7 +1031,7 @@ function copySelected(){
     c.email||'',                                      // A 联系邮箱
     c.seq||'',                                        // B 编号
     c.name||'',                                       // C ChannelName
-    c.url||'',                                        // D 账号链接
+    c.channelId ? `https://www.youtube.com/channel/${c.channelId}` : (c.url||''),  // D 账号链接（统一 /channel/UCxxxx）
     c.platform||'',                                   // E Platform
     c.country||'',                                    // F 国家/地区
     c.category||'',                                   // G 内容垂类/风格
@@ -963,10 +1170,28 @@ async function startBatchImport(){
 }
 
 // ── BATCH SEARCH ──
+// ── 配额计数 + 配额满检测 + 模式切换 ──
+let quotaUsed = 0;
+function addQuota(n){ quotaUsed += n; }
+function isQuotaError(d){
+  if(!d || !d.error) return false;
+  const reasons = (d.error.errors||[]).map(e=>e.reason||'');
+  return reasons.includes('quotaExceeded') || reasons.includes('dailyLimitExceeded')
+      || (d.error.message||'').toLowerCase().includes('quota');
+}
+function onBsModeChange(){
+  const inc = document.getElementById('bsMode').value === 'incremental';
+  const w = document.getElementById('bsIncDaysWrap');
+  if(w) w.style.display = inc ? '' : 'none';
+}
+
 async function batchSearch(){
-  const keyword = document.getElementById('bsKeyword').value.trim();
-  if(!keyword){ setStatus('bsStatus','请输入搜索关键词','error'); return; }
+  const rawKw = document.getElementById('bsKeyword').value.trim();
+  if(!rawKw){ setStatus('bsStatus','请输入搜索关键词','error'); return; }
   if(!YT_KEY){ setStatus('bsStatus','请先在【达人搜集】Tab 底部填写 YouTube API Key','error'); return; }
+
+  // 多关键词：一行一个，去空去重
+  const keywords = [...new Set(rawKw.split('\n').map(s=>s.trim()).filter(Boolean))];
 
   const filterCountry  = document.getElementById('bsCountry').value.trim().toUpperCase();
   const filterMinSub   = +document.getElementById('bsMinSub').value   || 0;
@@ -981,30 +1206,102 @@ async function batchSearch(){
   document.getElementById('bsResultsWrap').style.display = 'none';
   searchResults = [];
 
-  setProgress('bsProgressBar','bsProgressText','bsProgressSection', 2, '正在搜索频道...');
+  setProgress('bsProgressBar','bsProgressText','bsProgressSection', 2,
+    `正在搜索 ${keywords.length} 个关键词...`);
   setStatus('bsStatus','','info');
 
   try{
-    // Step 1: search.list (100 units)
-    // type=video: 按视频标题/描述/hashtag 搜索，提取所属频道，比 type=channel 覆盖更广
-    const sr = await fetch(
-      `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(keyword)}&type=video&maxResults=50&key=${YT_KEY}`
-    );
-    const sd = await sr.json();
-    if(sd.error){ setStatus('bsStatus','搜索失败：'+sd.error.message,'error'); btn.disabled=false; document.getElementById('bsBtnText').textContent='开始搜索（最多50个频道）'; return; }
+    // Step 0: 载入长期建联表用于去重（未配置则跳过，静默降级为纯本地去重）
+    if(SHEET_URL){
+      try{ await loadSheetPool(); }
+      catch(e){ setStatus('bsStatus','建联表读取失败（本次仅本地去重）：'+e.message,'error'); }
+    }
 
-    // 从视频结果中提取唯一频道 ID
-    const channelIds = [...new Set((sd.items||[]).map(i=>i.snippet.channelId).filter(Boolean))];
-    if(!channelIds.length){ setStatus('bsStatus','未找到相关频道，请换个关键词','error'); btn.disabled=false; document.getElementById('bsBtnText').textContent='开始搜索（最多50个频道）'; return; }
+    // 读取模式与翻页参数
+    const mode      = document.getElementById('bsMode').value;                       // deep | incremental
+    const incDays   = Math.max(1, +document.getElementById('bsIncDays').value || 7);
+    const maxPages  = Math.min(10, Math.max(1, +document.getElementById('bsDeepPages').value || 5));
+    const targetNew = +document.getElementById('bsDeepTarget').value || 0;           // 0 = 不限（翻到底/配额满）
+    const publishedAfter = mode==='incremental'
+      ? new Date(Date.now() - incDays*86400000).toISOString()
+      : '';
 
-    setProgress('bsProgressBar','bsProgressText','bsProgressSection', 8, `获取 ${channelIds.length} 个频道详情...`);
+    // 开跑前配额粗估（上限）：词数 × 最大页数 × 100(search)。超阈值先弹确认
+    const estSearch = keywords.length * maxPages * 100;
+    if(estSearch > 2000 &&
+       !confirm(`本次最多可能翻 ${keywords.length} 词 × ${maxPages} 页 = 约 ${estSearch} units（仅 search 部分，拉详情还会更多）。\n每日额度 10000。确定继续吗？`)){
+      btn.disabled=false; document.getElementById('bsBtnText').textContent='开始搜索'; hideProgress('bsProgressSection'); return;
+    }
 
-    // Step 2: channels.list batch (1 unit)
-    const cr = await fetch(
-      `https://www.googleapis.com/youtube/v3/channels?part=statistics,snippet&id=${channelIds.join(',')}&key=${YT_KEY}`
-    );
-    const cd = await cr.json();
-    let channels = cd.items || [];
+    // Step 1: 逐词翻页（nextPageToken），边翻边用 seen/本地库/建联表去重，只收集全新频道
+    quotaUsed = 0;
+    let quotaHit  = false;   // 配额满标志
+    let totalPages = 0;
+    const channelKeyword = {};        // cid -> 首次搜到它的关键词（仅全新频道）
+    const newCids  = [];              // 收集到的全新频道 cid
+    const newCidSet = new Set();
+
+    outer:
+    for(let k=0; k<keywords.length; k++){
+      const kw = keywords[k];
+      let pageToken = '';
+      for(let page=0; page<maxPages; page++){
+        setProgress('bsProgressBar','bsProgressText','bsProgressSection',
+          2 + Math.round(((k + page/maxPages)/keywords.length)*10),
+          `搜索「${kw}」第 ${page+1} 页 · 已找到 ${newCids.length} 个新频道`);
+
+        let url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(kw)}&type=video&maxResults=50&key=${YT_KEY}`;
+        if(publishedAfter) url += `&order=date&publishedAfter=${encodeURIComponent(publishedAfter)}`;
+        if(pageToken)      url += `&pageToken=${pageToken}`;
+
+        const sr = await fetch(url);
+        const sd = await sr.json();
+        addQuota(100); totalPages++;
+
+        if(isQuotaError(sd)){ quotaHit = true; break outer; }
+        if(sd.error){
+          // 仅当第一词第一页就出错（如 Key 无效）才算硬失败，否则停当前词继续下一词
+          if(k===0 && page===0){ setStatus('bsStatus','搜索失败：'+sd.error.message,'error'); btn.disabled=false; document.getElementById('bsBtnText').textContent='开始搜索'; hideProgress('bsProgressSection'); return; }
+          break;
+        }
+
+        (sd.items||[]).forEach(i=>{
+          const cid = i.snippet?.channelId;
+          if(!cid || newCidSet.has(cid)) return;
+          // 边翻边去重：已在 seen / 本地库 / 建联表 的一律跳过（不再拉详情，省配额）
+          if(seen[cid] || isInDb('', cid) || inSheetPool(cid, '')) return;
+          newCidSet.add(cid); newCids.push(cid); channelKeyword[cid] = kw;
+        });
+
+        if(targetNew && newCids.length >= targetNew) break outer;   // 凑够目标新频道数，整体停
+        pageToken = sd.nextPageToken || '';
+        if(!pageToken) break;                                        // 该词翻到底（~500 上限）
+      }
+    }
+
+    const channelIds = newCids;
+    if(!channelIds.length){
+      const msg = quotaHit ? '今日配额已用尽，且未翻到新频道，请明日换新词再试'
+                           : '没有找到全新频道（可能都已搜过/已入库/已在建联表），请换新词或调大页数';
+      setStatus('bsStatus', msg, quotaHit?'error':'info');
+      btn.disabled=false; document.getElementById('bsBtnText').textContent='开始搜索'; hideProgress('bsProgressSection'); return;
+    }
+
+    setProgress('bsProgressBar','bsProgressText','bsProgressSection', 12,
+      `翻了 ${totalPages} 页，找到 ${channelIds.length} 个全新频道，正在拉取详情...`);
+
+    // Step 2: channels.list 分批（每批最多 50 个 id，超过 50 需拆分）
+    let channels = [];
+    for(let i=0; i<channelIds.length; i+=50){
+      const idBatch = channelIds.slice(i, i+50);
+      const cr = await fetch(
+        `https://www.googleapis.com/youtube/v3/channels?part=statistics,snippet&id=${idBatch.join(',')}&key=${YT_KEY}`
+      );
+      const cd = await cr.json();
+      addQuota(1);
+      if(isQuotaError(cd)){ quotaHit = true; break; }
+      if(cd.items) channels.push(...cd.items);
+    }
 
     // Pre-filter by subscribers and country (no video data needed)
     channels = channels.filter(ch=>{
@@ -1018,7 +1315,7 @@ async function batchSearch(){
 
     if(!channels.length){
       setStatus('bsStatus','无频道通过粉丝量/国家筛选，请调整条件','error');
-      btn.disabled=false; document.getElementById('bsBtnText').textContent='开始搜索（最多50个频道）';
+      btn.disabled=false; document.getElementById('bsBtnText').textContent='开始搜索';
       hideProgress('bsProgressSection'); return;
     }
 
@@ -1043,10 +1340,8 @@ async function batchSearch(){
         const country  = snippet.country||'';
         const subs     = +stats.subscriberCount||0;
         const name     = snippet.title||cid;
-        const customUrl= snippet.customUrl;
-        const chanUrl  = customUrl
-          ? `https://www.youtube.com/${customUrl}`
-          : `https://www.youtube.com/channel/${cid}`;
+        // 统一用 /channel/UCxxxx 形式：链接自带 channelId，去重最可靠（不用 @handle）
+        const chanUrl  = `https://www.youtube.com/channel/${cid}`;
 
         // activities.list (1 unit)
         let avgViews=0, avgLikes=0, avgComments=0;
@@ -1055,6 +1350,7 @@ async function batchSearch(){
             `https://www.googleapis.com/youtube/v3/activities?part=contentDetails&channelId=${cid}&maxResults=10&key=${YT_KEY}`
           );
           const vd = await vr.json();
+          addQuota(1);
           const ids = (vd.items||[])
             .filter(i=>i.contentDetails?.upload?.videoId)
             .map(i=>i.contentDetails.upload.videoId).join(',');
@@ -1064,6 +1360,7 @@ async function batchSearch(){
               `https://www.googleapis.com/youtube/v3/videos?part=statistics,snippet&id=${ids}&key=${YT_KEY}`
             );
             const vsd = await vs.json();
+            addQuota(1);
             let n=0;
             (vsd.items||[]).forEach(v=>{
               avgViews   +=+v.statistics.viewCount||0;
@@ -1079,6 +1376,7 @@ async function batchSearch(){
             try{
               const br = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=brandingSettings&id=${cid}&key=${YT_KEY}`);
               const bd = await br.json();
+              addQuota(1);
               email = extractEmail(bd.items?.[0]?.brandingSettings?.channel?.description||'');
             } catch(e){}
           }
@@ -1092,27 +1390,42 @@ async function batchSearch(){
         if(filterMinER>0 && (er===null || er < filterMinER)) return;
 
         const inDb = isInDb(chanUrl, cid);
-        results.push({ cid, name, chanUrl, country, subs, avgViews, avgLikes, avgComments, er, email, inDb });
+        const inSheet = inSheetPool(cid, chanUrl);
+        results.push({ cid, name, chanUrl, country, subs, avgViews, avgLikes, avgComments, er, email, inDb, inSheet });
       }));
     }
 
+    // 跨搜索去重：先按历史 seen 标注每条结果（是否之前搜过），再把本次结果写入 seen
+    const today = new Date().toISOString().split('T')[0];
+    results.forEach(r=>{ r.seenInfo = seen[r.cid] || null; });
+    results.forEach(r=>{
+      if(!seen[r.cid]) seen[r.cid] = { keyword: channelKeyword[r.cid] || (keywords[0]||''), date: today };
+    });
+    saveSeen();
+
     searchResults = results;
+    const newCount = results.length;   // 深挖/增量模式已在搜索阶段剔除旧频道，结果即全新
     setProgress('bsProgressBar','bsProgressText','bsProgressSection', 100,
-      `完成！找到 ${results.length} 个符合条件的频道，其中 ${results.filter(r=>r.inDb).length} 个已在库`);
+      `完成！翻了 ${totalPages} 页，找到 ${newCount} 个符合条件的新频道`);
 
     renderSearchResults();
     document.getElementById('bsResultsWrap').style.display = 'block';
-    const newCount = results.filter(r=>!r.inDb).length;
-    setStatus('bsStatus',
-      `✓ 搜索完成：${results.length} 个频道符合筛选条件（新 ${newCount} 条 / 已在库 ${results.length-newCount} 条）`,
-      'success');
+    if(quotaHit){
+      setStatus('bsStatus',
+        `⚠️ 今日配额已用尽：已找到 ${newCount} 个全新频道（翻 ${totalPages} 页，约耗 ${quotaUsed} units）。明日可换新词继续`,
+        'error');
+    } else {
+      setStatus('bsStatus',
+        `✓ 搜索完成：翻 ${totalPages} 页，${newCount} 个全新频道通过筛选（约耗 ${quotaUsed} units）`,
+        'success');
+    }
 
   } catch(e){
     setStatus('bsStatus','搜索出错：'+e.message,'error');
   }
 
   btn.disabled=false;
-  document.getElementById('bsBtnText').textContent='开始搜索（最多50个频道）';
+  document.getElementById('bsBtnText').textContent='开始搜索';
 }
 
 function renderSearchResults(){
@@ -1122,15 +1435,31 @@ function renderSearchResults(){
     document.getElementById('bsSelCount').textContent='已选 0 条';
     return;
   }
+  const onlyNew = document.getElementById('bsOnlyNew')?.checked;
+  let visibleCount = 0;
   const rows = searchResults.map((r,i)=>{
+    // 「只看全新频道」：隐藏已在建联表/已在库/之前搜过的（用 return '' 保留原索引 i，避免加入按钮错位）
+    if(onlyNew && (r.inSheet || r.inDb || r.seenInfo)) return '';
+    visibleCount++;
     const er = r.er;
-    const disabled = r.inDb ? 'disabled' : '';
-    const rowCls   = r.inDb ? ' class="bs-indb"' : '';
-    const statusTag= r.inDb
-      ? '<span class="indb-tag">⚠️ 已在库</span>'
-      : '<span class="new-tag">✦ 新</span>';
+    // 已在建联表或本地库 → 锁定：不可勾选、不显示「加入」
+    const locked   = r.inSheet || r.inDb;
+    const disabled = locked ? 'disabled' : '';
+    const rowCls   = locked ? ' class="bs-indb"' : '';
+    let statusTag;
+    if(r.inSheet){
+      statusTag = '<span class="sheet-tag">📇 已在建联表</span>';
+    } else if(r.inDb){
+      statusTag = '<span class="indb-tag">✅ 已在库</span>';
+    } else if(r.seenInfo){
+      const sd = (r.seenInfo.date||'').split('-');
+      const dLabel = sd.length===3 ? `${+sd[1]}月${+sd[2]}日` : (r.seenInfo.date||'');
+      statusTag = `<span class="seen-tag">👀 ${dLabel}『${r.seenInfo.keyword||''}』搜过</span>`;
+    } else {
+      statusTag = '<span class="new-tag">🆕 全新</span>';
+    }
     return `<tr${rowCls}>
-      <td class="chk-td"><input type="checkbox" class="bs-chk" id="bsr-${i}" ${disabled} ${!r.inDb?'checked':''} onchange="updateBsSelCount()"></td>
+      <td class="chk-td"><input type="checkbox" class="bs-chk" id="bsr-${i}" ${disabled} ${!locked?'checked':''} onchange="updateBsSelCount()"></td>
       <td class="name-cell" style="max-width:200px">
         <div>${r.name}</div>
         <a href="${r.chanUrl}" target="_blank">↗ 查看频道</a>
@@ -1142,9 +1471,15 @@ function renderSearchResults(){
       <td><span class="er-pill ${erClass(er)}">${erLabel(er)}</span></td>
       <td class="email-cell">${r.email||'—'}</td>
       <td>${statusTag}</td>
-      <td>${!r.inDb?`<button class="btn btn-ghost" style="padding:.3rem .65rem;font-size:.68rem" onclick="addSingleSearch(${i})">加入</button>`:''}</td>
+      <td>${!locked?`<button class="btn btn-ghost" style="padding:.3rem .65rem;font-size:.68rem" onclick="addSingleSearch(${i})">加入</button>`:''}</td>
     </tr>`;
   }).join('');
+
+  if(onlyNew && visibleCount===0){
+    c.innerHTML='<div class="empty-state"><div class="diamond">◇</div><p>本次结果都搜过或已在库，没有全新频道</p></div>';
+    updateBsSelCount();
+    return;
+  }
 
   c.innerHTML=`<div style="overflow-x:auto"><table>
     <thead><tr>
@@ -1171,23 +1506,25 @@ function toggleAllSearch(cb){
 
 function addSingleSearch(idx){
   const r = searchResults[idx];
-  if(!r || r.inDb) return;
+  if(!r || r.inDb || r.inSheet) return;
   pushSearchResult(r);
   r.inDb = true;
   save(); renderTable(); updateStats(); renderSearchResults();
   showToast('已加入：'+r.name);
   setStatus('bsStatus','✓ 已加入 1 个频道，切换到【达人搜集】查看','success');
+  writeBack([r]);
 }
 
 function addSelectedSearch(){
   const checked = [...document.querySelectorAll('.bs-chk:checked')];
   const indices = checked.map(el=>+el.id.replace('bsr-',''));
-  const toAdd = indices.map(i=>searchResults[i]).filter(r=>r&&!r.inDb);
+  const toAdd = indices.map(i=>searchResults[i]).filter(r=>r&&!r.inDb&&!r.inSheet);
   if(!toAdd.length){ showToast('没有可添加的新频道'); return; }
   toAdd.forEach(r=>{ pushSearchResult(r); r.inDb=true; });
   save(); renderTable(); updateStats(); renderSearchResults();
   showToast('已加入 '+toAdd.length+' 个频道到达人库');
   setStatus('bsStatus','✓ 已加入 '+toAdd.length+' 个频道，切换到【达人搜集】Tab 查看','success');
+  writeBack(toAdd);
 }
 
 function pushSearchResult(r){
@@ -1212,6 +1549,9 @@ function resetSearch(){
   document.getElementById('bsResultsWrap').style.display='none';
   hideProgress('bsProgressSection');
   document.getElementById('bsStatus').className='status-bar';
+  // 复位开关（注意：仅重置当前结果显示，跨搜索的 seen 记录不清除）
+  const on = document.getElementById('bsOnlyNew');   if(on) on.checked=false;
+  const sa = document.getElementById('bsSelectAll'); if(sa) sa.checked=false;
 }
 
 // ── POST TRACKER ──
